@@ -1,0 +1,15 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+click = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
+
+[scripts]
+submitter = "python -c \"from submitter.cli import main; main()\""
