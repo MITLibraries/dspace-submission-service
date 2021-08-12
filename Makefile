@@ -26,8 +26,8 @@ publish: dist ## Build, tag and push
 
 lint: bandit black flake8 isort ## Runs all linters
 
-bandit: ## Security oriented static analyser for python code 
-	pipenv run bandit -r .
+bandit: ## Security oriented static analyser for python code
+	pipenv run bandit -r submitter
 
 black: ## The Uncompromising Code Formatter
 	pipenv run black --check --diff .
