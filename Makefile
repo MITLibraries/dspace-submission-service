@@ -8,7 +8,7 @@ help: ## Print this message
 /^[-_[:alpha:]]+:.?*##/ { printf "  %-15s%s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 install:
-	pipenv install
+	pipenv install --dev
 
 dist: ## Build docker container
 	docker build -t submitter .

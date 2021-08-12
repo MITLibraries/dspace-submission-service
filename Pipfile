@@ -5,9 +5,11 @@ name = "pypi"
 
 [packages]
 click = "*"
-submitter = {editable = true, path = "."}
 
 [dev-packages]
 
 [requires]
 python_version = "3.9"
+
+[scripts]
+submitter = "python -c \"from submitter.cli import main; main()\""
