@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     name: Deploy staging build
-    needs: test
     runs-on: ubuntu-latest
     env:
       AWS_DEFAULT_REGION: us-east-1
