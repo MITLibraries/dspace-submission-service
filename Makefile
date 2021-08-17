@@ -11,8 +11,8 @@ install:
 	pipenv install --dev
 
 dist: ## Build docker container
-	docker build -t $(ECR_REGISTRY)/dspacediscoveryservice-stage:latest \
-		-t $(ECR_REGISTRY)/dspacediscoveryservice-stage:`git describe --always` \
+	docker build -t $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest \
+		-t $(ECR_REGISTRY)/dspacesubmissionservice-stage:`git describe --always` \
 		-t submitter:latest .	
 
 update: install ## Update all Python dependencies
@@ -21,5 +21,5 @@ update: install ## Update all Python dependencies
 
 publish: dist ## Build, tag and push
 	docker login -u AWS -p $$(aws ecr get-login-password --region us-east-1) $(ECR_REGISTRY)
-	docker push $(ECR_REGISTRY)/dspacediscoveryservice-stage:latest
-	docker push $(ECR_REGISTRY)/dspacediscoveryservice-stage:`git describe --always`
+	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest
+	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:`git describe --always`
