@@ -28,9 +28,16 @@ like so:
 MessageAttributes = {
     "PackageID": {
         "DataType": "String",
-        "StringValue": "<A unique ID created by the producer application that
+        "StringValue": "<A unique ID created by the submitting application that
             will allow said application to match the result information to each
-            submitted package, e.g. 'etd_123123'>"
+            submitted package, e.g. 'etd_123123' or '98765'. This system is agnostic about the value of the ID.>"
+    },
+    "SubmissionSource": {
+        "DataType": "String",
+        "StringValue": "<Name of the submitting system, e.g. 'ETD'. Should be
+            consistent for each submitting system (should not change over
+            time).>"
+
     }
 }
 ```
