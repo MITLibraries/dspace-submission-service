@@ -3,9 +3,9 @@ import json
 import boto3
 
 
-def sample_data_loader(id, source, target, col_hdl, meta_loc, filename, fileloc):
+def sample_data_loader(id, source, target, col_hdl, meta_loc, filename, fileloc, queue):
     sqs = boto3.resource("sqs")
-    queue = sqs.get_queue_by_name(QueueName="queue1-stage")
+    queue = sqs.get_queue_by_name(QueueName=queue)
     body = {
         "SubmissionSystem": target,
         "CollectionHandle": col_hdl,
@@ -24,7 +24,7 @@ def sample_data_loader(id, source, target, col_hdl, meta_loc, filename, fileloc)
     )
 
 
-def sample_data():
+def sample_data(queue):
     sample_data_loader(
         "123",
         "ETD",
@@ -33,6 +33,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "466",
@@ -42,6 +43,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "789",
@@ -51,6 +53,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "asd",
@@ -60,6 +63,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "feg",
@@ -69,6 +73,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "hij",
@@ -78,6 +83,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "etd_123",
@@ -87,6 +93,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "wiley_456",
@@ -96,6 +103,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "orange",
@@ -105,6 +113,7 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )
     sample_data_loader(
         "cat",
@@ -114,4 +123,5 @@ def sample_data():
         "s3:/fakeloc/a.json",
         "file 1",
         "s3:/fakeloc2/f.json",
+        queue,
     )

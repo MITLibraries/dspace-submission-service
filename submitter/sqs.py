@@ -2,18 +2,18 @@ import boto3
 import click
 
 
-def message_loop():
-    msgs = retrieve()
+def message_loop(input_queue, output_queue, wait):
+    msgs = retrieve(input_queue, wait)
 
     if len(msgs) > 0:
         click.echo(len(msgs))
-        process(msgs)
-        message_loop()
+        process(msgs, output_queue)
+        message_loop(input_queue, output_queue, wait)
     else:
         click.echo("No messages received")
 
 
-def process(msgs):
+def process(msgs, output_queue):
     for message in msgs:
         click.echo(message.message_attributes)
         click.echo(message.body)
@@ -43,21 +43,21 @@ def process(msgs):
         }
 
         # write result to output
-        write(status)
+        write(status, output_queue)
 
         # cleanup (probs better to confirm the write to the output was good
         # before cleanup but for now yolo it)
         message.delete()
 
 
-def retrieve():
+def retrieve(input_queue, wait):
     sqs = boto3.resource("sqs")
-    queue = sqs.get_queue_by_name(QueueName="queue1-stage")
+    queue = sqs.get_queue_by_name(QueueName=input_queue)
 
     click.echo("Polling for messages")
     msgs = queue.receive_messages(
         MaxNumberOfMessages=10,
-        WaitTimeSeconds=20,
+        WaitTimeSeconds=wait,
         MessageAttributeNames=["All"],
         AttributeNames=["All"],
     )
@@ -65,9 +65,9 @@ def retrieve():
     return msgs
 
 
-def write(status):
+def write(status, output_queue):
     sqs = boto3.resource("sqs")
-    queue = sqs.get_queue_by_name(QueueName="queue2-stage")
+    queue = sqs.get_queue_by_name(QueueName=output_queue)
 
     # Send message to SQS result queue
     queue.send_message(

@@ -37,3 +37,9 @@ flake8: ## Tool For Style Guide Enforcement
 
 isort: ## isort your imports, so you don't have to
 	pipenv run isort . --diff
+
+test: ## runs pytest
+	pipenv run pytest
+
+coveralls: test
+	pipenv run coveralls
