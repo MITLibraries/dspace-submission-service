@@ -8,5 +8,5 @@ setup(
     install_requires=[
         "Click",
     ],
-    entry_points={"console_scripts": ["submitter=submitter.cli:hello"]},
+    entry_points={"console_scripts": ["submitter=submitter.cli:main"]},
 )
