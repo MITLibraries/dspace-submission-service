@@ -1,10 +1,10 @@
-# 1. Submission message spec
+# 3. Submission message spec
 
 Date: 2021-08-25
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
