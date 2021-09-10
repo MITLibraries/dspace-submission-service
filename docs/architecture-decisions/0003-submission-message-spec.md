@@ -6,6 +6,8 @@ Date: 2021-08-25
 
 Accepted
 
+Amended by [6. Submission message spec](0006-submission-message-spec.md)
+
 ## Context
 
 Multiple external applications will write to the SQS submit queue used by this
@@ -19,7 +21,9 @@ We will use the following submission message specification:
 Each SQS Message sent to the dspace-submission-service submit queue will
 contain two components, MessageAttributes and MessageBody.
 
-#### MessageAttributes
+### MessageAttributes
+
+[Important: See Updated MessageAttributes in 6. Submission message spec](0006-submission-message-spec.md)
 
 MessageAttributes is a JSON object containing one item, PackageID, structured
 like so:
@@ -42,7 +46,7 @@ MessageAttributes = {
 }
 ```
 
-#### MessageBody
+### MessageBody
 
 SQS requires that the MessageBody be a string. However, this service and the
 submitting applications will want to parse/create the MessageBody as JSON
