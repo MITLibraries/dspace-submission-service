@@ -106,3 +106,5 @@ all messages posted to the result queue will follow this specification.
 All messages that have been processed from the input queue will have
 corresponding result messages in the output queue regardless of success or
 failure of submission to DSpace.
+
+Note that all consuming applications will need to delete each message from the result queue when they have successfully processed it.
