@@ -7,6 +7,12 @@ setup(
     include_package_data=True,
     install_requires=[
         "Click",
+        "boto3",
+        "smart-open",
+        (
+            "dspace-python-client @ git+https://github.com/mitlibraries/"
+            "dspace-python-client@0.1.0#egg=dspace"
+        ),
     ],
     entry_points={"console_scripts": ["submitter=submitter.cli:main"]},
 )
