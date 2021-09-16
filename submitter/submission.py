@@ -1,6 +1,7 @@
 import json
 import logging
 import traceback
+from datetime import datetime
 
 import dspace
 import smart_open
@@ -48,8 +49,10 @@ class Submission:
                 yield entry
 
     def result_error_message(self, error, info):
+        time = datetime.now()
         self.result_message = {
             "ResultType": "error",
+            "ErrorTimestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "ErrorInfo": info,
             "ExceptionMessage": str(error),
             "ExceptionTraceback": traceback.format_exc(),

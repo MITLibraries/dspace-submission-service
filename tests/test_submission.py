@@ -1,6 +1,7 @@
 import traceback
 
 from dspace import Bitstream, Item
+from freezegun import freeze_time
 
 from submitter.submission import Submission
 
@@ -38,11 +39,13 @@ def test_get_metadata_entries_from_file():
     assert next(metadata) == {"key": "dc.title", "value": "Test Thesis"}
 
 
+@freeze_time("2021-09-01 05:06:07")
 def test_result_error_message(input_message_good):
     submission = Submission.from_message(input_message_good)
     error = KeyError()
     submission.result_error_message(error, "A test error")
     assert submission.result_message["ResultType"] == "error"
+    assert submission.result_message["ErrorTimestamp"] == "2021-09-01 05:06:07"
     assert submission.result_message["ErrorInfo"] == "A test error"
     assert submission.result_message["ExceptionMessage"] == str(error)
     assert submission.result_message["ExceptionTraceback"] == traceback.format_exc()
