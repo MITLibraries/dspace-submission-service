@@ -89,6 +89,8 @@ MessageBody = {
 ```json
 MessageBody = {
     "ResultType": "error",
+    "ErrorTimestamp": "Timestamp when the error occurred. Provided to help external
+        service maintainers investigate the issue",
     "ErrorInfo": "Information provided by the DSpace Submission Service about
         where in the process the error occurred, e.g. 'Error occurred while
         posting item to DSpace'",
