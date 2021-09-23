@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def message_loop(queue, wait):
     logger.info("Message loop started")
-    msgs = retrieve(queue, wait)
+    msgs = retrieve_messages_from_queue(queue, wait)
 
     if len(msgs) > 0:
         process(msgs)
@@ -35,7 +35,7 @@ def process(msgs):
             # TODO: handle and test submit message errors
             raise e
         submission.submit(client)
-        write(
+        write_message_to_queue(
             submission.result_attributes,
             json.dumps(submission.result_message),
             submission.result_queue,
@@ -46,7 +46,7 @@ def process(msgs):
         logger.info("Deleted message %s from input queue", message_id)
 
 
-def retrieve(input_queue, wait):
+def retrieve_messages_from_queue(input_queue, wait):
     sqs = boto3.resource("sqs")
     queue = sqs.get_queue_by_name(QueueName=input_queue)
 
@@ -62,7 +62,7 @@ def retrieve(input_queue, wait):
     return msgs
 
 
-def write(attributes, body, output_queue):
+def write_message_to_queue(attributes, body, output_queue):
     sqs = boto3.resource("sqs")
     queue = sqs.get_queue_by_name(QueueName=output_queue)
     queue.send_message(
