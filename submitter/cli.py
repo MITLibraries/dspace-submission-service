@@ -1,8 +1,12 @@
+import logging
+
 import click
 
-from submitter import INPUT_QUEUE, OUTPUT_QUEUE
+from submitter import config
 from submitter.sample_data import sample_data
 from submitter.sqs import message_loop
+
+logger = logging.getLogger(__name__)
 
 
 @click.group()
@@ -12,21 +16,22 @@ def main():
 
 @main.command()
 @click.option(
-    "--input-queue", default=INPUT_QUEUE, help="queue name to use as input queue"
-)
-@click.option(
-    "--output-queue", default=OUTPUT_QUEUE, help="queue name to use as output queue"
+    "--queue", default=config.INPUT_QUEUE, help="Name of queue to process messages from"
 )
 @click.option("--wait", default=20, help="seconds to wait for long polling. max 20")
-def start(input_queue, output_queue, wait):
-    click.echo("Processing starting")
-    message_loop(input_queue, output_queue, wait)
-    click.echo("Processing complete")
+def start(queue, wait):
+    logger.info("Starting processing messages from queue %s", queue)
+    message_loop(queue, wait)
+    logger.info("Completed processing messages from queue %s", queue)
 
 
 @main.command()
-@click.option("--queue", default=INPUT_QUEUE, help="queue name to use as input queue")
+@click.option(
+    "--queue",
+    default=config.INPUT_QUEUE,
+    help="Name of queue to load sample messages to",
+)
 def sample_data_loader(queue):
-    click.echo("sample this!")
+    logger.info("sample this!")
     sample_data(queue)
-    click.echo("sample data (probably) loaded into input queue")
+    logger.info("sample data (probably) loaded into input queue")

@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 click = "*"
 boto3 = "*"
+smart-open = "*"
+dspace-python-client = {ref = "0.1.0", git = "https://github.com/mitlibraries/dspace-python-client.git"}
 
 [dev-packages]
 flake8 = "*"
@@ -15,6 +17,10 @@ bandit = "*"
 moto = {extras = ["s3", "sqs"], version = "*"}
 pytest = "*"
 coveralls = "*"
+requests-mock = "*"
+pytest-cov = "*"
+pytest-env = "*"
+freezegun = "*"
 
 [requires]
 python_version = "3.9"

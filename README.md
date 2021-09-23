@@ -37,4 +37,4 @@ make dist
 docker run submitter:latest --
 ```
 
-note: the application requires being run in an environment with Roles based access to the AWS resources.
+note: the application requires being run in an environment with Roles based access to the AWS resources. in addition, the environment must have WORKSPACE and SSM_PATH variables set according to stage and prod conventions.

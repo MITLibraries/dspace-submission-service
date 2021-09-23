@@ -39,7 +39,7 @@ isort: ## isort your imports, so you don't have to
 	pipenv run isort . --diff
 
 test: ## runs pytest
-	pipenv run pytest
+	pipenv run pytest --cov=submitter
 
 coveralls: test
 	pipenv run coveralls

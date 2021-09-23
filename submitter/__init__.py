@@ -1,6 +1,6 @@
 """
 DSpace Submission Service
 """
+import logging
 
-INPUT_QUEUE = "queue1-stage"
-OUTPUT_QUEUE = "queue2-stage"
+logging.basicConfig(level=logging.INFO)
