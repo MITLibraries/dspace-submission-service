@@ -10,8 +10,16 @@ def test_cli_sample_data_loader(mocked_sqs):
     assert len(sqs_messages) == 0
 
     runner = CliRunner()
-    result = runner.invoke(main, ["sample-data-loader", "--input_queue",
-                           "empty_input_queue", "--output_queue", "empty_result_queue"])
+    result = runner.invoke(
+        main,
+        [
+            "sample-data-loader",
+            "--input_queue",
+            "empty_input_queue",
+            "--output_queue",
+            "empty_result_queue",
+        ],
+    )
     assert result.exit_code == 0
 
     sqs_messages = queue.receive_messages()

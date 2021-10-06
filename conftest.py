@@ -204,6 +204,34 @@ def input_message_bitstream_post_error(mocked_sqs):
     yield message
 
 
+@pytest.fixture
+def raw_attributes():
+    yield test_attributes
+
+
+@pytest.fixture
+def raw_body():
+    yield json.dumps(
+        {
+            "SubmissionSystem": "DSpace@MIT",
+            "CollectionHandle": "0000/collection01",
+            "MetadataLocation": "tests/fixtures/test-item-metadata.json",
+            "Files": [
+                {
+                    "BitstreamName": "test-file-01.pdf",
+                    "FileLocation": "tests/fixtures/test-file-01.pdf",
+                    "BitstreamDescription": "A test bitstream",
+                },
+                {
+                    "BitstreamName": "No file",
+                    "FileLocation": "tests/fixtures/nothing-here",
+                    "BitstreamDescription": "No file",
+                },
+            ],
+        }
+    )
+
+
 item_post_response = {
     "uuid": "item01",
     "name": "Test Thesis",

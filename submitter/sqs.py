@@ -20,9 +20,9 @@ def sqs_client():
     return sqs
 
 
-def message_loop(queue, wait):
+def message_loop(queue, wait, visibility=30):
     logger.info("Message loop started")
-    msgs = retrieve_messages_from_queue(queue, wait)
+    msgs = retrieve_messages_from_queue(queue, wait, visibility)
 
     if len(msgs) > 0:
         process(msgs)
@@ -61,7 +61,7 @@ def process(msgs):
         logger.info("Deleted message %s from input queue", message_id)
 
 
-def retrieve_messages_from_queue(input_queue, wait):
+def retrieve_messages_from_queue(input_queue, wait, visibility=30):
     sqs = sqs_client()
     queue = sqs.get_queue_by_name(QueueName=input_queue)
 
@@ -71,6 +71,7 @@ def retrieve_messages_from_queue(input_queue, wait):
         WaitTimeSeconds=wait,
         MessageAttributeNames=["All"],
         AttributeNames=["All"],
+        VisibilityTimeout=visibility,
     )
     logger.info("%d messages received", len(msgs))
 
@@ -93,8 +94,9 @@ def create(name):
     return queue
 
 
-def data_loader(id, source, target, col_hdl, meta_loc, filename, fileloc, input_queue,
-                output_queue):
+def data_loader(
+    id, source, target, col_hdl, meta_loc, filename, fileloc, input_queue, output_queue
+):
     sqs = sqs_client()
     queue = sqs.get_queue_by_name(QueueName=input_queue)
     body = {

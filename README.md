@@ -38,6 +38,9 @@ While this provides local SQS queues, please note it does not provide local DSpa
 
 [Please insert instructions here!!]
 
+If you are just interested in testing SQS aspects of the application, you can bypass
+DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env` file
+
 ## Sample Data
 
 `pipenv run submitter sample-data-loader --input-queue=YOUR_INPUT_QUEUE --output-queue=YOUR_OUTPUT_QUEUE` will load some sample data into the SQS input queue
