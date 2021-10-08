@@ -24,6 +24,9 @@ publish: dist ## Build, tag and push
 	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest
 	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:`git describe --always`
 
+run-stage: 
+	aws ecs run-task --cluster dspacesubmissionservice-stage --task-definition dspacesubmissionservice-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-0744a5c9beeb49a20],securityGroups=[sg-06b90b77a06e5870a],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
+
 lint: bandit black flake8 isort ## Runs all linters
 
 bandit: ## Security oriented static analyser for python code
