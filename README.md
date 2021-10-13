@@ -24,9 +24,7 @@ will be helpful to understand how to create and run commands.
 
 It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode(https://github.com/spulec/moto#stand-alone-server-mode)] rather than using true AWS SQS queues.
 
-Once you have moto running sqs in standalone mode (see instructions in link above),
-you'll need to:
-
+To use, start moto running sqs in standalone mode with `pipenv run moto_server`, then:
 - add `SQS_ENDPOINT_URL='http://localhost:5000'` to your `.env` file
 - create the queues you'd like to use
   - pipenv run submitter create-queue --name=YOUR_INPUT_QUEUE

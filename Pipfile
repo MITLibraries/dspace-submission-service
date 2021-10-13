@@ -14,7 +14,7 @@ flake8 = "*"
 black = "==21.7b0"
 isort = "*"
 bandit = "*"
-moto = {extras = ["s3", "sqs"], version = "*"}
+moto = {extras = ["s3", "server", "sqs"], version = "*"}
 pytest = "*"
 coveralls = "*"
 requests-mock = "*"
