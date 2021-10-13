@@ -14,9 +14,9 @@ def test_cli_sample_data_loader(mocked_sqs):
         main,
         [
             "sample-data-loader",
-            "--input_queue",
+            "--input-queue",
             "empty_input_queue",
-            "--output_queue",
+            "--output-queue",
             "empty_result_queue",
         ],
     )

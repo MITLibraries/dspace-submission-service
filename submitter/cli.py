@@ -27,12 +27,12 @@ def start(queue, wait):
 
 @main.command()
 @click.option(
-    "--input_queue",
+    "--input-queue",
     default=config.INPUT_QUEUE,
     help="Name of queue to load sample messages to",
 )
 @click.option(
-    "--output_queue",
+    "--output-queue",
     help="Name of queue to send output messages to",
 )
 def sample_data_loader(input_queue, output_queue):
@@ -42,7 +42,8 @@ def sample_data_loader(input_queue, output_queue):
 
 
 @main.command()
-@click.option("--name", help="name of queue to create")
+@click.argument("name")
 def create_queue(name):
+    """Create queue with NAME supplied as argument"""
     queue = create(name)
     logger.info(queue.url)
