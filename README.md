@@ -20,9 +20,32 @@ pipenv run submitter --help
 The [Click documentation](https://click.palletsprojects.com/en/8.0.x/quickstart/)
 will be helpful to understand how to create and run commands.
 
+## Using Moto for local SQS queues
+
+It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode(https://github.com/spulec/moto#stand-alone-server-mode)] rather than using true AWS SQS queues.
+
+To use, start moto running sqs in standalone mode with `pipenv run moto_server`, then:
+
+- add `SQS_ENDPOINT_URL='http://localhost:5000'` to your `.env` file
+- create the queues you'd like to use
+  - pipenv run submitter create-queue YOUR_INPUT_QUEUE
+  - pipenv run submitter create-queue YOUR_OUTPUT_QUEUE
+
+While this provides local SQS queues, please note it does not provide local DSpace so you currently still need to use the test server and real credentials.
+
+## Local development with DSpace
+
+[Please insert instructions here!!]
+
+If you are just interested in testing SQS aspects of the application, you can bypass
+DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env` file
+
 ## Sample Data
 
-`pipenv run submitter sample-data-loader` will load some sample data into the SQS input queue
+`pipenv run submitter sample-data-loader --input-queue=YOUR_INPUT_QUEUE --output-queue=YOUR_OUTPUT_QUEUE` will load some sample data into the SQS input queue
+
+Warning: please do not run this against the production system or a bunch of junk records
+will load into dspace
 
 ## Processing
 
