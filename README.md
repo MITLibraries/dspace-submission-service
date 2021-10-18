@@ -61,3 +61,8 @@ docker run submitter:latest --
 ```
 
 note: the application requires being run in an environment with Roles based access to the AWS resources. in addition, the environment must have WORKSPACE and SSM_PATH variables set according to stage and prod conventions.
+
+## Makefile Info 
+### Run-Stage
+Run-stage is outputted by the terraform used to create the infrastructure and copy/pasted here for convenience.
+Calling run-stage will execute the latest version of the container in the stage environment using the MITVPC.
