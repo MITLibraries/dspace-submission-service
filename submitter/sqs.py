@@ -42,7 +42,28 @@ def process(msgs):
         logger.info("Processing message %s from source %s", message_id, message_source)
 
         if config.SKIP_PROCESSING == "true":
+            fake_body = {
+                "ResultType": "success",
+                "ItemHandle": "1721.1/132072",
+                "lastModified": "Wed Oct 20 15:00:10 UTC 2021",
+                "Bitstreams": [
+                    {"BitstreamName": "a_pdf.pdf",
+                     "BitstreamUUID": "0226755a-6ecf-4256-9c0a-38b07a20868f",
+                     "BitstreamChecksum": {"value": "2800ec8c99c60f5b15520beac9939a46",
+                                           "checkSumAlgorithm": "MD5"}}]}
+
             logger.info("Skipping processing due to config")
+            attributes = {
+                "PackageID": {"DataType": "String", "StringValue": message_id},
+                "SubmissionSource": {"DataType": "String", "StringValue": message_source}
+            }
+            output_queue = message.message_attributes["OutputQueue"]["StringValue"]
+
+            write_message_to_queue(
+                attributes,
+                json.dumps(fake_body),
+                output_queue,
+            )
         else:
             try:
                 submission = Submission.from_message(message)
@@ -113,6 +134,19 @@ def data_loader(
             "PackageID": {"DataType": "String", "StringValue": id},
             "SubmissionSource": {"DataType": "String", "StringValue": source},
             "OutputQueue": {"DataType": "String", "StringValue": output_queue},
+        },
+        MessageBody=(json.dumps(body)),
+    )
+
+
+def output_data_loader(id, source, body, queue):
+    sqs = sqs_client()
+    queue = sqs.get_queue_by_name(QueueName=queue)
+    # Send message to SQS queue
+    queue.send_message(
+        MessageAttributes={
+            "PackageID": {"DataType": "String", "StringValue": id},
+            "SubmissionSource": {"DataType": "String", "StringValue": source}
         },
         MessageBody=(json.dumps(body)),
     )
