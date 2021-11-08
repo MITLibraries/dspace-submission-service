@@ -7,7 +7,7 @@ name = "pypi"
 click = "*"
 boto3 = "*"
 smart-open = "*"
-dspace-python-client = {ref = "0.1.0", git = "https://github.com/mitlibraries/dspace-python-client.git"}
+dspace-python-client = {git = "https://github.com/mitlibraries/dspace-python-client.git"}
 
 [dev-packages]
 flake8 = "*"

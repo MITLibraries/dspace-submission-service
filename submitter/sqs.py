@@ -33,7 +33,7 @@ def message_loop(queue, wait, visibility=30):
 
 def process(msgs):
     if config.SKIP_PROCESSING != "true":
-        client = DSpaceClient(config.DSPACE_API_URL)
+        client = DSpaceClient(config.DSPACE_API_URL, timeout=config.DSPACE_TIMEOUT)
         client.login(config.DSPACE_USER, config.DSPACE_PASSWORD)
 
     for message in msgs:

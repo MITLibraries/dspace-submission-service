@@ -20,7 +20,7 @@ pipenv run submitter --help
 The [Click documentation](https://click.palletsprojects.com/en/8.0.x/quickstart/)
 will be helpful to understand how to create and run commands.
 
-## Using Moto for local SQS queues
+### Using Moto for local SQS queues
 
 It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode(https://github.com/spulec/moto#stand-alone-server-mode)] rather than using true AWS SQS queues.
 
@@ -33,12 +33,19 @@ To use, start moto running sqs in standalone mode with `pipenv run moto_server`,
 
 While this provides local SQS queues, please note it does not provide local DSpace so you currently still need to use the test server and real credentials.
 
-## Local development with DSpace
+### Local development with DSpace
 
 [Please insert instructions here!!]
 
 If you are just interested in testing SQS aspects of the application, you can bypass
-DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env` file
+DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env`
+file.
+
+For local development, the default request timeout for requests sent to the DSpace API
+is 120 seconds due to slow response times from our test DSpace instance. However, this
+can make troubleshooting the DSpace connection tricky. To set a shorter (or longer if
+needed) timeout, add `DSPACE_TIMEOUT=<seconds as a float, e.g. 2.0>` to your `.env`
+file.
 
 ## Sample Data
 
