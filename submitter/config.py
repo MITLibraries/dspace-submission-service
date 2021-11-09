@@ -3,6 +3,7 @@ import os
 
 from submitter.ssm import SSM
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 env = os.getenv("WORKSPACE")

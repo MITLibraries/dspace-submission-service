@@ -3,7 +3,7 @@ from click.testing import CliRunner
 from submitter.cli import main
 
 
-def test_cli_sample_data_loader(mocked_sqs):
+def test_cli_load_sample_data(caplog, mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
 
     sqs_messages = queue.receive_messages()
@@ -13,7 +13,7 @@ def test_cli_sample_data_loader(mocked_sqs):
     result = runner.invoke(
         main,
         [
-            "sample-data-loader",
+            "load-sample-data",
             "--input-queue",
             "empty_input_queue",
             "--output-queue",
@@ -27,8 +27,6 @@ def test_cli_sample_data_loader(mocked_sqs):
 
 
 def test_cli_start(caplog, mocked_dspace, mocked_sqs):
-    # Required because pytest and CliRunner handle log capturing in incompatible ways
-    caplog.set_level(100000)
     input_queue = mocked_sqs.get_queue_by_name(QueueName="input_queue_with_messages")
     result_queue = mocked_sqs.get_queue_by_name(QueueName="empty_result_queue")
 

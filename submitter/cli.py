@@ -3,8 +3,8 @@ import logging
 import click
 
 from submitter import config
-from submitter.sample_data import sample_data
-from submitter.sqs import create, message_loop
+from submitter.message import generate_submission_messages_from_file
+from submitter.sqs import create, message_loop, write_message_to_queue
 
 logger = logging.getLogger(__name__)
 
@@ -27,18 +27,32 @@ def start(queue, wait):
 
 @main.command()
 @click.option(
+    "-i",
     "--input-queue",
     default=config.INPUT_QUEUE,
     help="Name of queue to load sample messages to",
 )
 @click.option(
+    "-o",
     "--output-queue",
-    help="Name of queue to send output messages to",
+    required=True,
+    help="Name of output queue to send result messages to",
 )
-def sample_data_loader(input_queue, output_queue):
-    logger.info("sample this!")
-    sample_data(input_queue, output_queue)
-    logger.info("sample data (probably) loaded into input queue")
+@click.option(
+    "-f",
+    "--filepath",
+    type=click.Path(exists=True),
+    default="tests/fixtures/completely-fake-data.json",
+    help="Path to json file of sample messages to load",
+)
+def load_sample_data(input_queue, output_queue, filepath):
+    logger.info(f"Loading sample data from file {filepath} into queue {input_queue}")
+    count = 0
+    messages = generate_submission_messages_from_file(filepath, output_queue)
+    for message in messages:
+        write_message_to_queue(message[0], message[1], input_queue)
+        count += 1
+    logger.info(f"{count} messages loaded into queue {input_queue}")
 
 
 @main.command()

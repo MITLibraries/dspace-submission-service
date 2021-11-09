@@ -3,7 +3,6 @@ from botocore.exceptions import ClientError
 
 from submitter.sqs import (
     create,
-    data_loader,
     message_loop,
     process,
     retrieve_messages_from_queue,
@@ -96,40 +95,3 @@ def test_message_loop(mocked_sqs, mocked_dspace):
     # confirm output queue is populated
     output_msgs = retrieve_messages_from_queue("empty_result_queue", 0)
     assert len(output_msgs) == 10
-
-
-def test_data_loader(mocked_sqs):
-    # confirm initial length of messages
-    # passing visibility as zero so the message_loop can access the messages
-    msgs = retrieve_messages_from_queue("empty_input_queue", 0, 0)
-    assert len(msgs) == 0
-
-    # load one
-    data_loader(
-        "id",
-        "source",
-        "target",
-        "handle",
-        "meta",
-        "name",
-        "loc",
-        "empty_input_queue",
-        "empty_output_queue",
-    )
-    msgs = retrieve_messages_from_queue("empty_input_queue", 0, 0)
-    assert len(msgs) == 1
-
-    # load another
-    data_loader(
-        "id2",
-        "source2",
-        "target2",
-        "handle2",
-        "meta2",
-        "name2",
-        "loc2",
-        "empty_input_queue",
-        "empty_output_queue",
-    )
-    msgs = retrieve_messages_from_queue("empty_input_queue", 0, 0)
-    assert len(msgs) == 2

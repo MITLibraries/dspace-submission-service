@@ -92,27 +92,3 @@ def create(name):
     sqs = sqs_client()
     queue = sqs.create_queue(QueueName=name)
     return queue
-
-
-def data_loader(
-    id, source, target, col_hdl, meta_loc, filename, fileloc, input_queue, output_queue
-):
-    sqs = sqs_client()
-    queue = sqs.get_queue_by_name(QueueName=input_queue)
-    body = {
-        "SubmissionSystem": target,
-        "CollectionHandle": col_hdl,
-        "MetadataLocation": meta_loc,
-        "Files": [
-            {"BitstreamName": filename, "FileLocation": fileloc},
-        ],
-    }
-    # Send message to SQS queue
-    queue.send_message(
-        MessageAttributes={
-            "PackageID": {"DataType": "String", "StringValue": id},
-            "SubmissionSource": {"DataType": "String", "StringValue": source},
-            "OutputQueue": {"DataType": "String", "StringValue": output_queue},
-        },
-        MessageBody=(json.dumps(body)),
-    )
