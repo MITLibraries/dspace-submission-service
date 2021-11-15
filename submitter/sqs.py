@@ -4,7 +4,7 @@ import logging
 import boto3
 from dspace.client import DSpaceClient
 
-from submitter import config
+from submitter import CONFIG
 from submitter.submission import Submission
 
 logger = logging.getLogger(__name__)
@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 def sqs_client():
     sqs = boto3.resource(
         service_name="sqs",
-        region_name=config.AWS_REGION_NAME,
-        endpoint_url=config.SQS_ENDPOINT_URL,
+        region_name=CONFIG.AWS_REGION_NAME,
+        endpoint_url=CONFIG.SQS_ENDPOINT_URL,
     )
 
     return sqs
@@ -32,16 +32,16 @@ def message_loop(queue, wait, visibility=30):
 
 
 def process(msgs):
-    if config.SKIP_PROCESSING != "true":
-        client = DSpaceClient(config.DSPACE_API_URL, timeout=config.DSPACE_TIMEOUT)
-        client.login(config.DSPACE_USER, config.DSPACE_PASSWORD)
+    if CONFIG.SKIP_PROCESSING != "true":
+        client = DSpaceClient(CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT)
+        client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
 
     for message in msgs:
         message_id = message.message_attributes["PackageID"]["StringValue"]
         message_source = message.message_attributes["SubmissionSource"]["StringValue"]
         logger.info("Processing message %s from source %s", message_id, message_source)
 
-        if config.SKIP_PROCESSING == "true":
+        if CONFIG.SKIP_PROCESSING == "true":
             logger.info("Skipping processing due to config")
         else:
             try:

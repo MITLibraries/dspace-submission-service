@@ -5,7 +5,7 @@ import boto3
 import pytest
 import requests_mock
 from dspace import DSpaceClient
-from moto import mock_sqs
+from moto import mock_sqs, mock_ssm
 
 
 @pytest.fixture(scope="function")
@@ -71,6 +71,48 @@ def mocked_sqs(aws_credentials):
                 ),
             )
         yield sqs
+
+
+@pytest.fixture(scope="function")
+def mocked_ssm(aws_credentials):
+    with mock_ssm():
+        ssm = boto3.client("ssm")
+        ssm.put_parameter(
+            Name="/test/example/dspace_api_url",
+            Value="mock://dspace.edu/rest/",
+            Type="String",
+        )
+        ssm.put_parameter(
+            Name="/test/example/dspace_user",
+            Value="test",
+            Type="String",
+        )
+        ssm.put_parameter(
+            Name="/test/example/dspace_password",
+            Value="test",
+            Type="SecureString",
+        )
+        ssm.put_parameter(
+            Name="/test/example/dspace_timeout",
+            Value="3.0",
+            Type="String",
+        )
+        ssm.put_parameter(
+            Name="/test/example/SQS_dss_input_queue",
+            Value="empty_input_queue",
+            Type="String",
+        )
+        ssm.put_parameter(
+            Name="/test/example/dss_log_filter",
+            Value="False",
+            Type="String",
+        )
+        ssm.put_parameter(
+            Name="/test/example/dss_log_level",
+            Value="info",
+            Type="String",
+        )
+        yield ssm
 
 
 @pytest.fixture(scope="function")

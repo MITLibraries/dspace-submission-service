@@ -20,6 +20,25 @@ pipenv run submitter --help
 The [Click documentation](https://click.palletsprojects.com/en/8.0.x/quickstart/)
 will be helpful to understand how to create and run commands.
 
+Set env variables in `.env` file as needed:
+- WORKSPACE: required, "dev" is a good value for local development
+- DSPACE_API_URL: only needed if publishing to DSpace, use DSpace test instance for
+  development
+- DSPACE_USER: only needed if publishing to DSpace
+- DSPACE_PASSWORD: only needed if publishing to DSpace
+- DSPACE_TIMEOUT: only needed if publishing to DSpace, defaults to 120 seconds
+- DSS_INPUT_QUEUE: input message queue to use for development (see section below on
+  using Moto for local SQS queues)
+- DSS_LOG_FILTER: filters out logs from external libraries, defaults to "true".
+  Can be useful to set this to "false" if there are errors that seem to involve
+  external libraries whose debug logs may have more information
+- DSS_LOG_LEVEL: level for logging, defaults to INFO. Can be useful to set to DEBUG for
+  more detailed logging
+- SKIP_PROCESSING: skips the publishing process for messages, defaults to "true". Can
+  be useful for working on just the SQS components of the application. Set to "false"
+  if messages should be processed and published
+- SQS_ENDPOINT_URL: needed if using Moto for local development (see section below)
+
 ### Using Moto for local SQS queues
 
 It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode(https://github.com/spulec/moto#stand-alone-server-mode)] rather than using true AWS SQS queues.
@@ -72,7 +91,7 @@ docker run submitter:latest --
 
 note: the application requires being run in an environment with Roles based access to the AWS resources. in addition, the environment must have WORKSPACE and SSM_PATH variables set according to stage and prod conventions.
 
-## Makefile Info 
+## Makefile Info
 ### Run-Stage
 Run-stage is outputted by the terraform used to create the infrastructure and copy/pasted here for convenience.
 Calling run-stage will execute the latest version of the container in the stage environment using the MITVPC.
