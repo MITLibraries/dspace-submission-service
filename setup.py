@@ -11,7 +11,7 @@ setup(
         "smart-open",
         (
             "dspace-python-client @ git+https://github.com/mitlibraries/"
-            "dspace-python-client@0.1.0#egg=dspace-python-client"
+            "dspace-python-client#egg=dspace-python-client"
         ),
     ],
     entry_points={"console_scripts": ["submitter=submitter.cli:main"]},

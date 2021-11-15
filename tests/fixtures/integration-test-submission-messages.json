@@ -1,0 +1,75 @@
+{
+  "should post succesfully": {
+    "package id": "dss-test-success",
+    "source": "dss testing",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/130883",
+    "metadata location": "tests/fixtures/test-item-metadata.json",
+    "files": [
+        {
+          "name": "test-file-01.pdf",
+          "location": "tests/fixtures/test-item-metadata.json",
+          "description": "A test bitstream"
+        }
+      ]
+    },
+  "should raise an item creation error": {
+    "package id": "dss-test-metadata-error",
+    "source": "dss testing",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/130883",
+    "metadata location": "tests/fixtures/test-item-metadata-error.json",
+    "files": [
+      {
+        "name": "test-file-01.pdf",
+        "location": "tests/fixtures/test-file-01.pdf",
+        "description": "A test bitstream"
+      }
+    ]
+  },
+  "should raise a bitstream creation error": {
+    "package id": "dss-test-bitstream-error",
+    "source": "dss testing",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/130883",
+    "metadata location": "tests/fixtures/test-item-metadata.json",
+    "files": [
+      {
+        "name": "test-file-01.pdf"
+      }
+    ]
+  },
+  "should raise an item post error": {
+    "package id": "dss-test-item-post-error",
+    "source": "dss testing",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/not-a-collection",
+    "metadata location": "tests/fixtures/test-item-metadata.json",
+    "files": [
+      {
+        "name": "test-file-01.pdf",
+        "location": "tests/fixtures/test-file-01.pdf",
+        "description": "A test bitstream"
+      }
+    ]
+  },
+  "should raise a bitstream post error": {
+    "package id": "dss-test-bitstream-post-error",
+    "source": "dss testing",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/130883",
+    "metadata location": "tests/fixtures/test-item-metadata.json",
+    "files": [
+      {
+        "name": "test-file-01.pdf",
+        "location": "tests/fixtures/test-file-01.pdf",
+        "description": "A test bitstream"
+      },
+      {
+        "name": "No file",
+        "location": "tests/fixtures/nothing-here",
+        "description": "No file"
+      }
+    ]
+  }
+}

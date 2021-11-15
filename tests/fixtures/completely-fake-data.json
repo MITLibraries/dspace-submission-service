@@ -1,0 +1,132 @@
+{
+  "message 1": {
+    "package id": "123",
+    "source": "ETD",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+        {
+          "name": "file 1",
+          "location": "s3:/fakeloc2/f.json"
+        }
+      ]
+    },
+  "message 2": {
+    "package id": "466",
+    "source": "ETD",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 3": {
+    "package id": "789",
+    "source": "ETD",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 4": {
+    "package id": "asd",
+    "source": "Wiley",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 5": {
+    "package id": "feg",
+    "source": "Wiley",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 6": {
+    "package id": "hij",
+    "source": "Wiley",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 7": {
+    "package id": "etd_123",
+    "source": "ETD",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 8": {
+    "package id": "wiley_456",
+    "source": "Wiley",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 9": {
+    "package id": "orange",
+    "source": "ETD",
+    "target system": "DSpace@MIT",
+    "collection handle": "1721.1/131022",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  },
+  "message 10": {
+    "package id": "cat",
+    "source": "popcorn",
+    "target system": "devnull",
+    "collection handle": "whatever",
+    "metadata location": "s3:/fakeloc/a.json",
+    "files": [
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json"
+      }
+    ]
+  }
+}
