@@ -3,7 +3,7 @@ from click.testing import CliRunner
 from submitter.cli import main
 
 
-def test_cli_load_sample_data(caplog, mocked_sqs):
+def test_cli_load_sample_data(mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
 
     sqs_messages = queue.receive_messages()
@@ -26,7 +26,7 @@ def test_cli_load_sample_data(caplog, mocked_sqs):
     assert len(sqs_messages) > 0
 
 
-def test_cli_start(caplog, mocked_dspace, mocked_sqs):
+def test_cli_start(mocked_dspace, mocked_sqs):
     input_queue = mocked_sqs.get_queue_by_name(QueueName="input_queue_with_messages")
     result_queue = mocked_sqs.get_queue_by_name(QueueName="empty_result_queue")
 
