@@ -39,7 +39,9 @@ def process(msgs):
     for message in msgs:
         message_id = message.message_attributes["PackageID"]["StringValue"]
         message_source = message.message_attributes["SubmissionSource"]["StringValue"]
-        logger.info("Processing message %s from source %s", message_id, message_source)
+        logger.info(
+            "Processing message '%s' from source '%s'", message_id, message_source
+        )
 
         if CONFIG.SKIP_PROCESSING == "true":
             logger.info("Skipping processing due to config")
@@ -52,13 +54,13 @@ def process(msgs):
             submission.submit(client)
             write_message_to_queue(
                 submission.result_attributes,
-                json.dumps(submission.result_message),
+                submission.result_message,
                 submission.result_queue,
             )
         # TODO: probs better to confirm the write to the output was good
         # before cleanup but for now yolo it
         message.delete()
-        logger.info("Deleted message %s from input queue", message_id)
+        logger.info("Deleted message '%s' from input queue", message_id)
 
 
 def retrieve_messages_from_queue(input_queue, wait, visibility=30):
@@ -78,14 +80,18 @@ def retrieve_messages_from_queue(input_queue, wait, visibility=30):
     return msgs
 
 
-def write_message_to_queue(attributes, body, output_queue):
+def write_message_to_queue(attributes: dict, body: dict, output_queue: str):
     sqs = sqs_client()
     queue = sqs.get_queue_by_name(QueueName=output_queue)
     queue.send_message(
         MessageAttributes=attributes,
-        MessageBody=body,
+        MessageBody=json.dumps(body),
     )
-    logger.info("Wrote message to %s with message body: %s", output_queue, body)
+    logger.debug(
+        "Wrote message to queue '%s' with message body: %s",
+        output_queue,
+        json.dumps(body, indent=2),
+    )
 
 
 def create(name):

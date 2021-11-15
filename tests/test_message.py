@@ -11,9 +11,14 @@ def test_generate_messages_from_file():
             "SubmissionSource": {"DataType": "String", "StringValue": "ETD"},
             "OutputQueue": {"DataType": "String", "StringValue": "empty_output_queue"},
         },
-        '{"SubmissionSystem": "DSpace@MIT", "CollectionHandle": "1721.1/131022", '
-        '"MetadataLocation": "s3:/fakeloc/a.json", "Files": [{"BitstreamName": '
-        '"file 1", "FileLocation": "s3:/fakeloc2/f.json"}]}',
+        {
+            "SubmissionSystem": "DSpace@MIT",
+            "CollectionHandle": "1721.1/131022",
+            "MetadataLocation": "s3:/fakeloc/a.json",
+            "Files": [
+                {"BitstreamName": "file 1", "FileLocation": "s3:/fakeloc2/f.json"},
+            ],
+        },
     )
 
 

@@ -46,7 +46,7 @@ def start(queue, wait):
     help="Path to json file of sample messages to load",
 )
 def load_sample_data(input_queue, output_queue, filepath):
-    logger.info(f"Loading sample data from file {filepath} into queue {input_queue}")
+    logger.info(f"Loading sample data from file '{filepath}' into queue {input_queue}")
     count = 0
     messages = generate_submission_messages_from_file(filepath, output_queue)
     for message in messages:

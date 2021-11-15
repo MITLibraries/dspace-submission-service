@@ -70,8 +70,8 @@ file.
 
 `pipenv run submitter load-sample-data -i=YOUR_INPUT_QUEUE -o=YOUR_OUTPUT_QUEUE` will
 load some sample data into the SQS input queue. If you want to load data for
-integration testing with DSpace test, add an additional option to the command: `-f
-"tests/fixtures/integration-test-submission-messages"`.
+integration testing with DSpace test, add an additional option to the command:
+`-f tests/fixtures/integration-test-submission-messages.json`.
 
 Warning: please do not run this against the production system or a bunch of junk records
 will load into dspace

@@ -1,9 +1,12 @@
+import sys
 import traceback
 
+import pytest
 from dspace import Bitstream, Item
 from freezegun import freeze_time
 
-from submitter.submission import Submission
+from submitter.errors import DSpaceTimeoutError
+from submitter.submission import Submission, prettify
 
 
 def test_init_submission_from_message(input_message_good):
@@ -42,13 +45,14 @@ def test_get_metadata_entries_from_file():
 @freeze_time("2021-09-01 05:06:07")
 def test_result_error_message(input_message_good):
     submission = Submission.from_message(input_message_good)
-    error = KeyError()
-    submission.result_error_message(error, "A test error")
+    submission.result_error_message("A test error")
     assert submission.result_message["ResultType"] == "error"
     assert submission.result_message["ErrorTimestamp"] == "2021-09-01 05:06:07"
     assert submission.result_message["ErrorInfo"] == "A test error"
-    assert submission.result_message["ExceptionMessage"] == str(error)
-    assert submission.result_message["ExceptionTraceback"] == traceback.format_exc()
+    assert submission.result_message["DSpaceResponse"] == "N/A"
+    assert submission.result_message["ExceptionTraceback"] == prettify(
+        traceback.format_exception(*sys.exc_info())
+    )
 
 
 def test_result_success_message(input_message_good):
@@ -83,7 +87,7 @@ def test_submit_success(mocked_dspace, test_client, input_message_good):
     assert submission.result_message["ResultType"] == "success"
 
 
-def test_submit_create_item_error(
+def test_submit_item_create_error(
     mocked_dspace, test_client, input_message_item_create_error
 ):
     submission = Submission.from_message(input_message_item_create_error)
@@ -91,7 +95,8 @@ def test_submit_create_item_error(
     assert submission.result_message["ResultType"] == "error"
     assert (
         submission.result_message["ErrorInfo"]
-        == "Error occurred while creating item metadata from file"
+        == "Error occurred while creating item metadata entries from file "
+        "'tests/fixtures/test-item-metadata-error.json'"
     )
 
 
@@ -103,7 +108,8 @@ def test_submit_add_bitstreams_error(
     assert submission.result_message["ResultType"] == "error"
     assert (
         submission.result_message["ErrorInfo"]
-        == "Error occurred while adding bitstreams to item from files"
+        == "Error occurred while parsing bitstream information from files listed in "
+        "submission message."
     )
 
 
@@ -115,17 +121,48 @@ def test_submit_item_post_error(
     assert submission.result_message["ResultType"] == "error"
     assert (
         submission.result_message["ErrorInfo"]
-        == "Error occurred while posting item to DSpace"
+        == "Error occurred while posting item to DSpace collection "
+        "'0000/not-a-collection'"
     )
 
 
-def test_submit_bitstream_post_error(
-    mocked_dspace, test_client, input_message_bitstream_post_error
+def test_submit_dspace_timeout_raises_error(
+    mocked_dspace, test_client, input_message_item_post_dspace_timeout
 ):
-    submission = Submission.from_message(input_message_bitstream_post_error)
+    submission = Submission.from_message(input_message_item_post_dspace_timeout)
+    with pytest.raises(DSpaceTimeoutError) as e:
+        submission.submit(test_client)
+        assert (
+            e.value
+            == "DSpace server at 'http://mock.com/' took more than 3.0 seconds to "
+            "respond. Aborting DSpace Submission Service processing until this can be "
+            "investigated.\nNOTE: The submission in process when this occurred likely "
+            "has partially published data in DSpace. The package id of the submission "
+            "was'{submission_attributes['PackageID']}', from source "
+            "'{submission_attributes['SumissionSource']}'"
+        )
+
+
+def test_submit_bitstream_post_file_open_error(
+    mocked_dspace, test_client, input_message_bitstream_file_open_error
+):
+    submission = Submission.from_message(input_message_bitstream_file_open_error)
     submission.submit(test_client)
     assert submission.result_message["ResultType"] == "error"
     assert submission.result_message["ErrorInfo"] == (
-        "Error occurred while posting bitstreams to item in DSpace. Item with handle "
-        "0000/item01 and any successfully posted bitstreams have been deleted"
+        "Error occurred while opening file 'tests/fixtures/nothing-here' for "
+        "bitstream. Item '0000/item01' and any bitstreams already posted to it will "
+        "be deleted"
+    )
+
+
+def test_submit_bitstream_post_dspace_error(
+    mocked_dspace, test_client, input_message_bitstream_dspace_post_error
+):
+    submission = Submission.from_message(input_message_bitstream_dspace_post_error)
+    submission.submit(test_client)
+    assert submission.result_message["ResultType"] == "error"
+    assert submission.result_message["ErrorInfo"] == (
+        "Error occurred while posting bitstream 'test-file-01.pdf' to item in DSpace. "
+        "Item '0000/item02' and any bitstreams already posted to it will be deleted"
     )
