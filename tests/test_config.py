@@ -41,7 +41,7 @@ def test_dev_config_success():
     os.environ["DSPACE_TIMEOUT"] = "1.0"
     os.environ.pop("DSS_INPUT_QUEUE", None)
     os.environ["DSS_LOG_FILTER"] = "False"
-    os.environ["LOG_LEVEL"] = "debug"
+    os.environ["DSS_LOG_LEVEL"] = "debug"
     os.environ["SKIP_PROCESSING"] = "True"
     os.environ.pop("SQS_ENDPOINT_URL", None)
     config = Config()
