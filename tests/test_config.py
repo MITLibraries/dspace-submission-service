@@ -29,6 +29,7 @@ def test_prod_stage_config_success(mocked_ssm):
     assert config.INPUT_QUEUE == "empty_input_queue"
     assert config.LOG_FILTER == "false"
     assert config.LOG_LEVEL == "INFO"
+    assert config.SENTRY_DSN == "http://12345.6789.sentry"
     assert config.SKIP_PROCESSING == "false"
     assert config.SQS_ENDPOINT_URL == "https://sqs.us-east-1.amazonaws.com/"
 
@@ -42,6 +43,7 @@ def test_dev_config_success():
     os.environ.pop("DSS_INPUT_QUEUE", None)
     os.environ["DSS_LOG_FILTER"] = "False"
     os.environ["DSS_LOG_LEVEL"] = "debug"
+    os.environ.pop("SENTRY_DSN", None)
     os.environ["SKIP_PROCESSING"] = "True"
     os.environ.pop("SQS_ENDPOINT_URL", None)
     config = Config()
@@ -52,5 +54,6 @@ def test_dev_config_success():
     assert config.INPUT_QUEUE is None
     assert config.LOG_FILTER == "false"
     assert config.LOG_LEVEL == "DEBUG"
+    assert config.SENTRY_DSN is None
     assert config.SKIP_PROCESSING == "true"
     assert config.SQS_ENDPOINT_URL is None

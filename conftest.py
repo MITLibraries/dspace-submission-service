@@ -131,6 +131,11 @@ def mocked_ssm(aws_credentials):
             Value="info",
             Type="String",
         )
+        ssm.put_parameter(
+            Name="/test/example/sentry_dsn",
+            Value="http://12345.6789.sentry",
+            Type="String",
+        )
         yield ssm
 
 

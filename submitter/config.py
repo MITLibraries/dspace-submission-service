@@ -14,9 +14,7 @@ class Config:
             print("Env variable 'WORKSPACE' is required, please set it and try again.")
             raise e
         self.AWS_REGION_NAME = "us-east-1"
-        logger.info(
-            "Configuring dspace-submission-service for current env: %s", self.ENV
-        )
+        print(f"Configuring dspace-submission-service for env={self.ENV}")
         self.load_config_variables(self.ENV)
 
     def load_config_variables(self, env: str):
@@ -49,6 +47,7 @@ class Config:
             self.LOG_LEVEL = ssm.get_parameter_value(
                 self.SSM_PATH + "dss_log_level"
             ).upper()
+            self.SENTRY_DSN = ssm.get_parameter_value(self.SSM_PATH + "sentry_dsn")
             self.SKIP_PROCESSING = "false"
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
         elif env == "test":
@@ -59,6 +58,7 @@ class Config:
             self.INPUT_QUEUE = "test_queue_with_messages"
             self.LOG_FILTER = "true"
             self.LOG_LEVEL = os.getenv("DSS_LOG_LEVEL", "INFO").upper()
+            self.SENTRY_DSN = None
             self.SKIP_PROCESSING = "false"
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
         else:
@@ -69,5 +69,13 @@ class Config:
             self.INPUT_QUEUE = os.getenv("DSS_INPUT_QUEUE")
             self.LOG_FILTER = os.getenv("DSS_LOG_FILTER", "true").lower()
             self.LOG_LEVEL = os.getenv("DSS_LOG_LEVEL", "INFO").upper()
+            self.SENTRY_DSN = os.getenv("DSS_SENTRY_DSN")
             self.SKIP_PROCESSING = os.environ.get("SKIP_PROCESSING", "false").lower()
             self.SQS_ENDPOINT_URL = os.environ.get("SQS_ENDPOINT_URL")
+
+    def check_sentry(self):
+        if self.SENTRY_DSN:
+            logger.info("Sending a Zero Division Error to Sentry")
+            1 / 0
+        else:
+            logger.info("No Sentry DSN found")
