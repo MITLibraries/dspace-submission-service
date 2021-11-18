@@ -3,7 +3,7 @@
     "package id": "dss-test-success",
     "source": "dss testing",
     "target system": "DSpace@MIT",
-    "collection handle": "1721.1/130883",
+    "collection handle": "1721.1/131022",
     "metadata location": "tests/fixtures/test-item-metadata.json",
     "files": [
         {
@@ -17,7 +17,7 @@
     "package id": "dss-test-metadata-error",
     "source": "dss testing",
     "target system": "DSpace@MIT",
-    "collection handle": "1721.1/130883",
+    "collection handle": "1721.1/131022",
     "metadata location": "tests/fixtures/test-item-metadata-error.json",
     "files": [
       {
@@ -31,7 +31,7 @@
     "package id": "dss-test-bitstream-error",
     "source": "dss testing",
     "target system": "DSpace@MIT",
-    "collection handle": "1721.1/130883",
+    "collection handle": "1721.1/131022",
     "metadata location": "tests/fixtures/test-item-metadata.json",
     "files": [
       {
@@ -53,11 +53,11 @@
       }
     ]
   },
-  "should raise a bitstream post error": {
-    "package id": "dss-test-bitstream-post-error",
+  "should raise a bitstream open error": {
+    "package id": "dss-test-bitstream-open-error",
     "source": "dss testing",
     "target system": "DSpace@MIT",
-    "collection handle": "1721.1/130883",
+    "collection handle": "1721.1/131022",
     "metadata location": "tests/fixtures/test-item-metadata.json",
     "files": [
       {

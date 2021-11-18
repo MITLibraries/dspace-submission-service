@@ -8,7 +8,7 @@ def generate_submission_messages_from_file(filepath, output_queue):
     for message_name, message_json in messages.items():
         attributes = attributes_from_json(message_json, output_queue)
         body = body_from_json(message_json)
-        yield attributes, json.dumps(body)
+        yield attributes, body
 
 
 def attributes_from_json(message_json, output_queue):

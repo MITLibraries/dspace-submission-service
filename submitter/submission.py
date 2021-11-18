@@ -1,10 +1,14 @@
 import json
 import logging
+import sys
 import traceback
 from datetime import datetime
 
 import dspace
+import requests
 import smart_open
+
+from submitter import errors
 
 logger = logging.getLogger(__name__)
 
@@ -42,20 +46,50 @@ class Submission:
             result_queue=message.message_attributes["OutputQueue"]["StringValue"],
         )
 
+    def create_item(self):
+        """Create item instance with metadata entries from submission message."""
+        try:
+            logger.debug("Creating local item instance from submission message")
+            item = dspace.item.Item()
+            for entry in self.get_metadata_entries_from_file():
+                metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
+                item.metadata.append(metadata_entry)
+            return item
+        except KeyError as e:
+            raise errors.ItemCreateError(self.metadata_location) from e
+
     def get_metadata_entries_from_file(self):
         with smart_open.open(self.metadata_location) as f:
             metadata = json.load(f)
             for entry in metadata["metadata"]:
                 yield entry
 
-    def result_error_message(self, error, info):
+    def add_bitstreams_to_item(self, item):
+        """Add bitstreams to item from files in submission message."""
+        try:
+            logger.debug(
+                "Adding bitstreams to local item instance from submission message"
+            )
+            for file in self.files:
+                bitstream = dspace.bitstream.Bitstream(
+                    file_path=file["FileLocation"],
+                    name=file["BitstreamName"],
+                    description=file.get("BitstreamDescription"),
+                )
+                item.bitstreams.append(bitstream)
+            return item
+        except KeyError as e:
+            raise errors.BitstreamAddError() from e
+
+    def result_error_message(self, message, dspace_response=None):
         time = datetime.now()
+        tb = traceback.format_exception(*sys.exc_info())
         self.result_message = {
             "ResultType": "error",
             "ErrorTimestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "ErrorInfo": info,
-            "ExceptionMessage": str(error),
-            "ExceptionTraceback": traceback.format_exc(),
+            "ErrorInfo": message,
+            "DSpaceResponse": dspace_response or "N/A",
+            "ExceptionTraceback": prettify(tb),
         }
 
     def result_success_message(self, item):
@@ -76,64 +110,100 @@ class Submission:
             )
 
     def submit(self, client):
-        # Create item instance and add metadata
-        try:
-            item = dspace.item.Item()
-            for entry in self.get_metadata_entries_from_file():
-                metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
-                item.metadata.append(metadata_entry)
-        except Exception as e:
-            self.result_error_message(
-                e, "Error occurred while creating item metadata from file"
-            )
-            return
+        """Submit a submission to DSpace as a new item with associated bitstreams.
 
-        # Add bitstreams to item from files
-        logger.info("Adding bitstreams to item")
-        try:
-            for file in self.files:
-                bitstream = dspace.bitstream.Bitstream(
-                    file_path=file["FileLocation"],
-                    name=file["BitstreamName"],
-                    description=file.get("BitstreamDescription"),
-                )
-                item.bitstreams.append(bitstream)
-        except Exception as e:
-            self.result_error_message(
-                e, "Error occurred while adding bitstreams to item from files"
-            )
-            return
+        Creates a local item instance from the submission message, adds bitstream
+        objects, posts the item to DSpace, and posts each bitstream to the posted
+        item. Creates result success message if successful, otherwise creates
+        appropriate result error message based on the specific exception raised during
+        submission.
 
-        # Post item to DSpace
+        Raises:
+            DSpaceTimeoutError: If the DSpace server takes longer than the
+                configuration timeout setting to respond. Because this indicates a
+                serious error on the DSpace side, rather than handling this exception
+                it is re-raised with some useful message information and stops the
+                entire SQS message loop process until someone can investigate further.
+        """
         try:
-            item.post(client, collection_handle=self.collection_handle)
+            item = self.create_item()
+            item = self.add_bitstreams_to_item(item)
+            post_item(client, item, self.collection_handle)
+            post_bitstreams(client, item)
+            self.result_success_message(item)
+        except requests.exceptions.Timeout as e:
+            raise errors.DSpaceTimeoutError(
+                client.base_url, self.result_attributes
+            ) from e
+        except (
+            errors.ItemCreateError,
+            errors.BitstreamAddError,
+            errors.ItemPostError,
+        ) as e:
+            self.result_error_message(e.message, getattr(e, "dspace_error", None))
+        except (errors.BitstreamOpenError, errors.BitstreamPostError) as e:
+            self.result_error_message(e.message, getattr(e, "dspace_error", None))
+            clean_up_partial_success(client, item)
         except Exception as e:
-            self.result_error_message(e, "Error occurred while posting item to DSpace")
-            return
-        logger.info("Posted item to Dspace with handle %s", item.handle)
-
-        # Post all bitstreams to item
-        try:
-            for bitstream in item.bitstreams:
-                bitstream.post(client, item_uuid=item.uuid)
-        except Exception as e:
-            handle = item.handle
-            for bitstream in item.bitstreams:
-                if bitstream.uuid is not None:
-                    bitstream.delete(client)
-            item.delete(client)
-            self.result_error_message(
-                e,
-                (
-                    f"Error occurred while posting bitstreams to item in DSpace. Item "
-                    f"with handle {handle} and any successfully posted bitstreams "
-                    f"have been deleted"
-                ),
+            logger.error(
+                "Unexpected exception, aborting DSpace Submission Service processing"
             )
-            return
-        logger.info(
-            "Posted %d bitstreams to item with handle %s",
-            len(item.bitstreams),
-            item.handle,
+            raise e
+
+
+def post_item(client, item, collection_handle):
+    """Post item with metadata to DSpace."""
+    try:
+        entries = [entry.to_dict() for entry in item.metadata]
+        logger.debug(
+            "Posting item to DSpace with metadata: %s",
+            json.dumps(entries, indent=2),
         )
-        self.result_success_message(item)
+        item.post(client, collection_handle=collection_handle)
+        logger.debug("Posted item to Dspace with handle '%s'", item.handle)
+    except requests.exceptions.Timeout as e:
+        raise e
+    except requests.exceptions.HTTPError as e:
+        raise errors.ItemPostError(e, collection_handle) from e
+
+
+def post_bitstreams(client, item):
+    """Post all bitstreams to an existing DSpace item."""
+    logger.debug(
+        "Posting %d bitstream(s) to item '%s' in DSpace",
+        len(item.bitstreams),
+        item.handle,
+    )
+    for bitstream in item.bitstreams:
+        try:
+            bitstream.post(client, item_uuid=item.uuid)
+            logger.debug(
+                "Posted bitstream '%s' to item '%s', new bitstream uuid is '%s'",
+                bitstream.name,
+                item.handle,
+                bitstream.uuid,
+            )
+        except FileNotFoundError as e:
+            raise errors.BitstreamOpenError(bitstream.file_path, item.handle) from e
+        except requests.exceptions.HTTPError as e:
+            raise errors.BitstreamPostError(e, bitstream.name, item.handle) from e
+
+
+def clean_up_partial_success(client, item):
+    logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
+    handle = item.handle
+    for bitstream in item.bitstreams:
+        if bitstream.uuid is not None:
+            uuid = bitstream.uuid
+            bitstream.delete(client)
+            logger.info("Bitstream '%s' deleted from DSpace", uuid)
+    item.delete(client)
+    logger.info("Item '%s' deleted from DSpace", handle)
+
+
+def prettify(traceback: list):
+    output = []
+    for item in traceback:
+        lines = item.strip().split("\n")
+        output.extend([line.strip().replace('\\"', "'") for line in lines])
+    return output

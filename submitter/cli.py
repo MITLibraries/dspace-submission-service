@@ -2,7 +2,7 @@ import logging
 
 import click
 
-from submitter import config
+from submitter import CONFIG
 from submitter.message import generate_submission_messages_from_file
 from submitter.sqs import create, message_loop, write_message_to_queue
 
@@ -16,7 +16,7 @@ def main():
 
 @main.command()
 @click.option(
-    "--queue", default=config.INPUT_QUEUE, help="Name of queue to process messages from"
+    "--queue", default=CONFIG.INPUT_QUEUE, help="Name of queue to process messages from"
 )
 @click.option("--wait", default=20, help="seconds to wait for long polling. max 20")
 def start(queue, wait):
@@ -29,7 +29,7 @@ def start(queue, wait):
 @click.option(
     "-i",
     "--input-queue",
-    default=config.INPUT_QUEUE,
+    default=CONFIG.INPUT_QUEUE,
     help="Name of queue to load sample messages to",
 )
 @click.option(
@@ -46,7 +46,7 @@ def start(queue, wait):
     help="Path to json file of sample messages to load",
 )
 def load_sample_data(input_queue, output_queue, filepath):
-    logger.info(f"Loading sample data from file {filepath} into queue {input_queue}")
+    logger.info(f"Loading sample data from file '{filepath}' into queue {input_queue}")
     count = 0
     messages = generate_submission_messages_from_file(filepath, output_queue)
     for message in messages:
