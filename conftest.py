@@ -89,6 +89,11 @@ def mocked_sqs(aws_credentials):
                     }
                 ),
             )
+        bad_queue = sqs.create_queue(QueueName="bad_input_messages")
+        bad_queue.send_message(
+            MessageAttributes=test_attributes,
+            MessageBody="Doesn't conform to the DSS spec",
+        )
         yield sqs
 
 
@@ -136,6 +141,11 @@ def mocked_ssm(aws_credentials):
             Value="http://12345.6789.sentry",
             Type="String",
         )
+        ssm.put_parameter(
+            Name="/test/example/dss_output_queues",
+            Value="test_output_1,test_output_2",
+            Type="StringList",
+        )
         yield ssm
 
 
@@ -165,6 +175,52 @@ def input_message_good(mocked_sqs):
                 ],
             }
         ),
+    )
+    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
+    yield message
+
+
+@pytest.fixture
+def input_message_nonconforming_body(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
+    queue.send_message(
+        MessageAttributes=test_attributes,
+        MessageBody="Doesn't conform to the DSS spec",
+    )
+    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
+    yield message
+
+
+@pytest.fixture
+def input_message_invalid_queue(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
+    queue.send_message(
+        MessageAttributes={
+            "PackageID": {"DataType": "String", "StringValue": "etdtest01"},
+            "SubmissionSource": {"DataType": "String", "StringValue": "etd"},
+            "OutputQueue": {
+                "DataType": "String",
+                "StringValue": "not-a-queue",
+            },
+        },
+        MessageBody="irrelevant",
+    )
+    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
+    yield message
+
+
+@pytest.fixture
+def input_message_missing_attribute(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
+    queue.send_message(
+        MessageAttributes={
+            "PackageID": {"DataType": "String", "StringValue": "etdtest01"},
+            "OutputQueue": {
+                "DataType": "String",
+                "StringValue": "empty_result_queue",
+            },
+        },
+        MessageBody="irrelevant",
     )
     message = queue.receive_messages(MessageAttributeNames=["All"])[0]
     yield message

@@ -5,11 +5,11 @@ import pytest
 from dspace import Bitstream, Item
 from freezegun import freeze_time
 
-from submitter.errors import DSpaceTimeoutError
+from submitter import errors
 from submitter.submission import Submission, prettify
 
 
-def test_init_submission_from_message(input_message_good):
+def test_submission_from_message_success(input_message_good):
     submission = Submission.from_message(input_message_good)
     assert submission.destination == "DSpace@MIT"
     assert submission.collection_handle == "0000/collection01"
@@ -27,6 +27,30 @@ def test_init_submission_from_message(input_message_good):
     }
     assert submission.result_message is None
     assert submission.result_queue == "empty_result_queue"
+
+
+def test_submission_from_message_creates_error_message(
+    input_message_nonconforming_body,
+):
+    submission = Submission.from_message(input_message_nonconforming_body)
+    assert submission.result_message == (
+        "Submission message did not conform to the DSS specification. Message body "
+        "provided was: 'Doesn't conform to the DSS spec'"
+    )
+
+
+def test_submission_from_message_raises_invalid_queue_error(
+    input_message_invalid_queue,
+):
+    with pytest.raises(errors.SubmitMessageInvalidResultQueueError):
+        Submission.from_message(input_message_invalid_queue)
+
+
+def test_submission_from_message_raises_missing_attribute_error(
+    input_message_missing_attribute,
+):
+    with pytest.raises(errors.SubmitMessageMissingAttributeError):
+        Submission.from_message(input_message_missing_attribute)
 
 
 def test_get_metadata_entries_from_file():
@@ -130,17 +154,8 @@ def test_submit_dspace_timeout_raises_error(
     mocked_dspace, test_client, input_message_item_post_dspace_timeout
 ):
     submission = Submission.from_message(input_message_item_post_dspace_timeout)
-    with pytest.raises(DSpaceTimeoutError) as e:
+    with pytest.raises(errors.DSpaceTimeoutError):
         submission.submit(test_client)
-        assert (
-            e.value
-            == "DSpace server at 'http://mock.com/' took more than 3.0 seconds to "
-            "respond. Aborting DSpace Submission Service processing until this can be "
-            "investigated.\nNOTE: The submission in process when this occurred likely "
-            "has partially published data in DSpace. The package id of the submission "
-            "was'{submission_attributes['PackageID']}', from source "
-            "'{submission_attributes['SumissionSource']}'"
-        )
 
 
 def test_submit_bitstream_post_file_open_error(
