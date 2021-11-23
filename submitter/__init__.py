@@ -16,5 +16,10 @@ logger = logging.getLogger(__name__)
 logger.info(
     "Logging configured with level=%s, filter=%s", CONFIG.LOG_LEVEL, CONFIG.LOG_FILTER
 )
-sentry_sdk.init(CONFIG.SENTRY_DSN, environment=CONFIG.ENV)
-logger.info("Sentry initialized with DSN=%s and env=%s", CONFIG.SENTRY_DSN, CONFIG.ENV)
+if CONFIG.SENTRY_DSN:
+    sentry_sdk.init(CONFIG.SENTRY_DSN, environment=CONFIG.ENV)
+    logger.info(
+        "Sentry initialized with DSN=%s and env=%s", CONFIG.SENTRY_DSN, CONFIG.ENV
+    )
+else:
+    logger.info("No SENTRY_DSN found, not enabling Sentry")
