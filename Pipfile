@@ -6,8 +6,9 @@ name = "pypi"
 [packages]
 click = "*"
 boto3 = "*"
-smart-open = "*"
 dspace-python-client = {git = "https://github.com/mitlibraries/dspace-python-client.git"}
+sentry-sdk = "*"
+smart-open = "*"
 
 [dev-packages]
 flake8 = "*"
