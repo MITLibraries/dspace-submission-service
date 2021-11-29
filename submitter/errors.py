@@ -131,6 +131,36 @@ class DSpaceTimeoutError(Exception):
         )
 
 
+class SQSMessageSendError(Exception):
+    """Exception raised when a message sent to an SQS result queue cannot be verified.
+
+    Args:
+        message_attributes: The attributes of the message that was not successfully sent
+        message_body: The body of the message that was not succesfully sent
+        result_queue: The name of the result queue that the message was sent to
+        submit_message_id: The SQS ID of the corresponding submit message
+
+    Attributes:
+        message(str): Explanation of the error
+    """
+
+    def __init__(
+        self,
+        message_attributes: dict,
+        message_body: dict,
+        result_queue: str,
+        submit_message_id: str,
+    ):
+        self.message = (
+            f"Message was not successfully sent to result queue '{result_queue}', "
+            "aborting DSpace Submission Service processing until this can be "
+            "investigated. NOTE: The submit message is likely still in the submission "
+            "queue and may need to be manually deleted before processing "
+            f"resumes. Submit message ID: {submit_message_id}. Result message "
+            f"attributes: {message_attributes}. Result message body: {message_body}"
+        )
+
+
 class SubmitMessageInvalidResultQueueError(Exception):
     """Exception raised due to an invalid result queue name in a submission message.
 

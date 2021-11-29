@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from botocore.exceptions import ClientError
 
@@ -7,6 +9,7 @@ from submitter.sqs import (
     process,
     retrieve_messages_from_queue,
     sqs_client,
+    verify_sent_message,
     write_message_to_queue,
 )
 
@@ -48,7 +51,8 @@ def test_write_message_to_queue(mocked_sqs, raw_attributes, raw_body):
     assert len(msgs) == 0
 
     # write to queue
-    write_message_to_queue(raw_attributes, raw_body, "empty_result_queue")
+    response = write_message_to_queue(raw_attributes, raw_body, "empty_result_queue")
+    assert "MD5OfMessageBody" in response
 
     # confirm queue has a message
     msgs = retrieve_messages_from_queue("empty_result_queue", 0)
@@ -106,3 +110,23 @@ def test_message_loop(mocked_sqs, mocked_dspace):
     # confirm output queue is populated
     output_msgs = retrieve_messages_from_queue("empty_result_queue", 0)
     assert len(output_msgs) == 10
+
+
+def test_verify_returns_true(mocked_sqs, raw_attributes, raw_body):
+    sqs = sqs_client()
+    queue = sqs.get_queue_by_name(QueueName="empty_result_queue")
+    response = queue.send_message(
+        MessageAttributes=raw_attributes,
+        MessageBody=json.dumps(raw_body),
+    )
+    assert verify_sent_message(raw_body, response) is True
+
+
+def test_verify_returns_false(mocked_sqs, raw_attributes, raw_body):
+    sqs = sqs_client()
+    queue = sqs.get_queue_by_name(QueueName="empty_result_queue")
+    response = queue.send_message(
+        MessageAttributes=raw_attributes,
+        MessageBody=json.dumps(raw_body),
+    )
+    assert verify_sent_message({"body": "a different message body"}, response) is False

@@ -1,10 +1,11 @@
+import hashlib
 import json
 import logging
 
 import boto3
 from dspace.client import DSpaceClient
 
-from submitter import CONFIG
+from submitter import CONFIG, errors
 from submitter.submission import Submission
 
 logger = logging.getLogger(__name__)
@@ -48,13 +49,23 @@ def process(msgs):
             submission = Submission.from_message(message)
             if not submission.result_message:
                 submission.submit(client)
-            write_message_to_queue(
+            response = write_message_to_queue(
                 submission.result_attributes,
                 submission.result_message,
                 submission.result_queue,
             )
-        # TODO: probs better to confirm the write to the output was good
-        # before cleanup but for now yolo it
+            if not verify_sent_message(submission.result_message, response):
+                raise errors.SQSMessageSendError(
+                    submission.result_attributes,
+                    submission.result_message,
+                    submission.result_queue,
+                    response["MessageId"],
+                )
+            logger.debug(
+                "Wrote message to queue '%s' with message body: %s",
+                submission.result_queue,
+                json.dumps(submission.result_message),
+            )
         message.delete()
         logger.info("Deleted message '%s' from input queue", message_id)
 
@@ -79,18 +90,23 @@ def retrieve_messages_from_queue(input_queue, wait, visibility=30):
 def write_message_to_queue(attributes: dict, body: dict, output_queue: str):
     sqs = sqs_client()
     queue = sqs.get_queue_by_name(QueueName=output_queue)
-    queue.send_message(
+    response = queue.send_message(
         MessageAttributes=attributes,
         MessageBody=json.dumps(body),
     )
-    logger.debug(
-        "Wrote message to queue '%s' with message body: %s",
-        output_queue,
-        json.dumps(body, indent=2),
-    )
+    return response
 
 
 def create(name):
     sqs = sqs_client()
     queue = sqs.create_queue(QueueName=name)
     return queue
+
+
+def verify_sent_message(
+    sent_message_body: dict, sqs_send_message_response: dict
+) -> bool:
+    body_md5 = hashlib.md5(  # nosec
+        json.dumps(sent_message_body).encode("utf-8")
+    ).hexdigest()
+    return body_md5 == sqs_send_message_response["MD5OfMessageBody"]
