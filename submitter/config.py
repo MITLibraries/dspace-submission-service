@@ -50,6 +50,9 @@ class Config:
             self.SENTRY_DSN = ssm.get_parameter_value(self.SSM_PATH + "sentry_dsn")
             self.SKIP_PROCESSING = "false"
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
+            self.VALID_RESULT_QUEUES = ssm.get_parameter_value(
+                self.SSM_PATH + "dss_output_queues"
+            ).split(",")
         elif env == "test":
             self.DSPACE_API_URL = "mock://dspace.edu/rest/"
             self.DSPACE_USER = "test"
@@ -61,6 +64,7 @@ class Config:
             self.SENTRY_DSN = None
             self.SKIP_PROCESSING = "false"
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
+            self.VALID_RESULT_QUEUES = ["empty_result_queue"]
         else:
             self.DSPACE_API_URL = os.getenv("DSPACE_API_URL")
             self.DSPACE_USER = os.getenv("DSPACE_USER")
@@ -72,6 +76,9 @@ class Config:
             self.SENTRY_DSN = os.getenv("DSS_SENTRY_DSN")
             self.SKIP_PROCESSING = os.environ.get("SKIP_PROCESSING", "false").lower()
             self.SQS_ENDPOINT_URL = os.environ.get("SQS_ENDPOINT_URL")
+            self.VALID_RESULT_QUEUES = os.getenv("DSS_OUTPUT_QUEUES", "output").split(
+                ","
+            )
 
     def check_sentry(self):
         if self.SENTRY_DSN:

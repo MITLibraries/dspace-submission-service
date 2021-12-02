@@ -32,6 +32,7 @@ def test_prod_stage_config_success(mocked_ssm):
     assert config.SENTRY_DSN == "http://12345.6789.sentry"
     assert config.SKIP_PROCESSING == "false"
     assert config.SQS_ENDPOINT_URL == "https://sqs.us-east-1.amazonaws.com/"
+    assert config.VALID_RESULT_QUEUES == ["test_output_1", "test_output_2"]
 
 
 def test_dev_config_success():
@@ -46,6 +47,7 @@ def test_dev_config_success():
     os.environ.pop("SENTRY_DSN", None)
     os.environ["SKIP_PROCESSING"] = "True"
     os.environ.pop("SQS_ENDPOINT_URL", None)
+    os.environ.pop("DSS_OUTPUT_QUEUES", None)
     config = Config()
     assert config.DSPACE_API_URL is None
     assert config.DSPACE_USER == "dev"
@@ -57,3 +59,4 @@ def test_dev_config_success():
     assert config.SENTRY_DSN is None
     assert config.SKIP_PROCESSING == "true"
     assert config.SQS_ENDPOINT_URL is None
+    assert config.VALID_RESULT_QUEUES == ["output"]

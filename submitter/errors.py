@@ -129,3 +129,44 @@ class DSpaceTimeoutError(Exception):
             f"of the submission was '{submission_attributes['PackageID']}', from "
             f"source '{submission_attributes['SubmissionSource']}'"
         )
+
+
+class SubmitMessageInvalidResultQueueError(Exception):
+    """Exception raised due to an invalid result queue name in a submission message.
+
+    Args:
+        message_id: The SQS message ID of the message causing the error
+        result_queue: The provided result queue name that caused the error
+
+    Attributes:
+        message(str): Explanation of the error
+    """
+
+    def __init__(self, message_id: str, result_queue: str):
+        self.message = (
+            "Aborting DSS processing due to a non-recoverable error:\nError occurred "
+            f"while processing message '{message_id}' from input queue "
+            f"'{CONFIG.INPUT_QUEUE}'. Message provided invalid result queue name "
+            f"'{result_queue}'. Valid result queue names are: "
+            f"{CONFIG.VALID_RESULT_QUEUES}."
+        )
+
+
+class SubmitMessageMissingAttributeError(Exception):
+    """Exception raised due to a missing required attribute in a submission message.
+
+    Args:
+        message_id: The SQS message ID of the message causing the error
+        attribute_name: The name of the attribute missing from the message
+
+    Attributes:
+        message(str): Explanation of the error
+    """
+
+    def __init__(self, message_id: str, attribute_name: str):
+        self.message = (
+            "Aborting DSS processing due to a non-recoverable error:\nError occurred "
+            f"while processing message '{message_id}' from input queue "
+            f"'{CONFIG.INPUT_QUEUE}'. Message was missing required attribute "
+            f"'{attribute_name}'."
+        )

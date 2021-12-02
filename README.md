@@ -38,6 +38,8 @@ Set env variables in `.env` file as needed:
   be useful for working on just the SQS components of the application. Set to "false"
   if messages should be processed and published
 - SQS_ENDPOINT_URL: needed if using Moto for local development (see section below)
+- DSS_OUTPUT_QUEUES": comma-separated string list of valid output queues, defaults to
+  "output". Update if using a different name for the output queue(s) in development
 
 ### Using Moto for local SQS queues
 

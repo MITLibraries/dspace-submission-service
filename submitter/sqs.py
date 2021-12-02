@@ -37,21 +37,17 @@ def process(msgs):
         client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
 
     for message in msgs:
-        message_id = message.message_attributes["PackageID"]["StringValue"]
-        message_source = message.message_attributes["SubmissionSource"]["StringValue"]
+        message_id = message.message_id
         logger.info(
-            "Processing message '%s' from source '%s'", message_id, message_source
+            "Processing message '%s' from queue '%s'", message_id, CONFIG.INPUT_QUEUE
         )
 
         if CONFIG.SKIP_PROCESSING == "true":
             logger.info("Skipping processing due to config")
         else:
-            try:
-                submission = Submission.from_message(message)
-            except Exception as e:
-                # TODO: handle and test submit message errors
-                raise e
-            submission.submit(client)
+            submission = Submission.from_message(message)
+            if not submission.result_message:
+                submission.submit(client)
             write_message_to_queue(
                 submission.result_attributes,
                 submission.result_message,

@@ -8,7 +8,7 @@ import dspace
 import requests
 import smart_open
 
-from submitter import errors
+from submitter import CONFIG, errors
 
 logger = logging.getLogger(__name__)
 
@@ -16,34 +16,77 @@ logger = logging.getLogger(__name__)
 class Submission:
     def __init__(
         self,
-        destination,
-        collection_handle,
-        metadata_location,
-        files,
         attributes,
         result_queue,
+        result_message=None,
+        destination=None,
+        collection_handle=None,
+        metadata_location=None,
+        files=None,
     ):
         self.destination = destination
         self.collection_handle = collection_handle
         self.metadata_location = metadata_location
         self.files = files
         self.result_attributes = attributes
-        self.result_message = None
+        self.result_message = result_message
         self.result_queue = result_queue
 
     @classmethod
     def from_message(cls, message):
-        body = json.loads(message.body)
-        return cls(
-            destination=body["SubmissionSystem"],
-            collection_handle=body["CollectionHandle"],
-            metadata_location=body["MetadataLocation"],
-            files=body["Files"],
-            attributes={
+        """
+        Create a submission with all necessary publishing data from a submit message.
+
+        Args:
+            message: An SQS message
+
+        Raises:
+            SubmitMessageInvalidResultQueueError
+            SubmitMessageMissingAttributeError
+        """
+        result_message = None
+        result_queue = message.message_attributes.get("OutputQueue", {}).get(
+            "StringValue", None
+        )
+        if result_queue not in CONFIG.VALID_RESULT_QUEUES:
+            raise errors.SubmitMessageInvalidResultQueueError(
+                message.message_id, result_queue
+            )
+
+        try:
+            attributes = {
                 "PackageID": message.message_attributes["PackageID"],
                 "SubmissionSource": message.message_attributes["SubmissionSource"],
-            },
-            result_queue=message.message_attributes["OutputQueue"]["StringValue"],
+            }
+        except KeyError as e:
+            raise errors.SubmitMessageMissingAttributeError(
+                message.message_id, e.args[0]
+            )
+
+        try:
+            body = json.loads(message.body)
+            destination = body["SubmissionSystem"]
+            collection_handle = body["CollectionHandle"]
+            metadata_location = body["MetadataLocation"]
+            files = body["Files"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            result_message = (
+                "Submission message did not conform to the DSS specification. Message "
+                f"body provided was: '{message.body}'"
+            )
+            return cls(
+                attributes=attributes,
+                result_queue=result_queue,
+                result_message=result_message,
+            )
+
+        return cls(
+            destination=destination,
+            collection_handle=collection_handle,
+            metadata_location=metadata_location,
+            files=files,
+            attributes=attributes,
+            result_queue=result_queue,
         )
 
     def create_item(self):
