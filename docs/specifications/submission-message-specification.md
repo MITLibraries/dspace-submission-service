@@ -18,15 +18,15 @@ up more easily with less (or hopefully no) custom code per submitting service.
 
 ## Specification
 
-Each SQS Message sent to the dspace-submission-service submit queue will
+Each SQS Message sent to the dspace-submission-service submit queue must
 contain two components, MessageAttributes and MessageBody.
 
 ### MessageAttributes
 
-MessageAttributes is a JSON object containing one item, PackageID, structured
-like so:
+MessageAttributes must be a JSON object containing three items: PackageID,
+SubmissionSource, and OutputQueue, structured as follows:
 
-```json
+```
 MessageAttributes = {
     "PackageID": {
         "DataType": "String",
@@ -51,7 +51,9 @@ MessageAttributes = {
 
 ### MessageBody
 
-SQS requires that the MessageBody be a string. However, this service and the
+MessageBody must be a string representation of a JSON object structured as follows.
+
+NOTE: SQS requires that the MessageBody be a string. However, this service and the
 submitting applications will want to parse/create the MessageBody as JSON
 objects, so the specification here shows the JSON object structure. The
 submitting application must convert the MessageBody to a string before sending
@@ -61,9 +63,9 @@ processing messages from the submit queue.
 ```
 MessageBody = {
     "SubmissionSystem": "Required - specific system to submit to, e.g.
-        'DSpace@MIT'"
+        'DSpace@MIT'",
     "CollectionHandle": "Required - handle for DSpace Collection to post item
-        to, e.g. '1721.1/131022'",
+        to, e.g. '1721.1/123456'",
     "MetadataLocation": "Required - S3 URI for item metadata JSON file, e.g.
         'S3://bucket/metadata_file.json>'",
     "Files": [
@@ -76,7 +78,54 @@ MessageBody = {
                 in DSpace, e.g. 'The Baker Report'"
         },
         {
-            "(At least one file object required. Repeat for all files in item.)"
+            Repeat above object as needed for all files in item. At least one file
+            object is required.
+
+            NOTE: DSS will post the bitstreams to the item in the order they are
+            present in this 'files' array of the message body. It is up to each
+            submitting application to determine which file should be the primary
+            bitstream for the item and ensure that file is the first one in this array
+            (if there are multiple files). All other files present in this array should
+            be listed in the order they should be displayed in DSpace, if there is a
+            preference.
+        }
+    ]
+}
+```
+
+## Example Submission Message
+
+```json
+MessageAttributes = {
+    "PackageID": {
+        "DataType": "String",
+        "StringValue": "12345"
+    },
+    "SubmissionSource": {
+        "DataType": "String",
+        "StringValue": "ETD"
+
+    },
+    "OutputQueue": {
+      "DataType": "String",
+      "StringValue": "etd-dss-input-queue"
+    }
+}
+
+MessageBody = {
+    "SubmissionSystem": "DSpace@MIT",
+    "CollectionHandle": "1721.1/123456",
+    "MetadataLocation": "S3://bucket-7/item-12345-metadata-file.json>'",
+    "Files": [
+        {
+            "BitstreamName": "very-important-thesis.pdf",
+            "FileLocation": "S3://bucket-7/thesis-12345.pdf'",
+            "BitstreamDescription": "Thesis PDF"
+        },
+        {
+            "BitstreamName": "supplementary-file-01.txt",
+            "FileLocation": "S3://bucket-7/thesis-12345-supplement-1.txt",
+            "BitstreamDescription": "Supplementary file"
         }
     ]
 }
