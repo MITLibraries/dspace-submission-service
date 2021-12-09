@@ -1,13 +1,4 @@
-# 7. Result message spec
-
-Date: 2021-09-10
-
-## Status
-
-Superceded by [8. Move message specifications](0008-move-specifications.md)
-
-See [Result Message Specification](../specifications/result-message-specification.md)
-for current version of this spec.
+# Result Message specification
 
 ## Context
 
@@ -15,9 +6,13 @@ Multiple external applications will read from the SQS result queues used by this
 service, so we need a specification to ensure consistent messages containing
 all data required for the consuming applications to process them.
 
-## Decision
+All messages that have been processed from the input queue will have
+corresponding result messages in the output queue regardless of success or
+failure of submission to DSpace.
 
-We will use the following result message specification:
+Note that all consuming applications will need to delete each message from the result queue when they have successfully processed it.
+
+## Specification
 
 Each SQS Message sent by the dspace-submission-service to one of its result
 queues will contain two components, MessageAttributes and MessageBody.
@@ -102,14 +97,3 @@ MessageBody = {
     "ExceptionTraceback": "Full unformatted stack trace of the Exception"
 }
 ```
-
-## Consequences
-
-Consuming applications will be able to handle result messages appropriately as  
-all messages posted to the result queue will follow this specification.
-
-All messages that have been processed from the input queue will have
-corresponding result messages in the output queue regardless of success or
-failure of submission to DSpace.
-
-Note that all consuming applications will need to delete each message from the result queue when they have successfully processed it.

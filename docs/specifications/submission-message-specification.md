@@ -1,15 +1,4 @@
-# 3. Submission message spec
-
-Date: 2021-08-25
-
-## Status
-
-Amended by [6. Submission message spec](0006-submission-message-spec.md)
-
-Superceded by [8. Move message specifications](0008-move-specifications.md)
-
-See [Submission Message Specification](../specifications/submission-message-specification.md)
-for current version of this spec.
+# Submission Message Specification
 
 ## Context
 
@@ -17,21 +6,27 @@ Multiple external applications will write to the SQS submit queue used by this
 service, so we need a specification they can follow to create consistent
 messages containing all data required for submitting an item to DSpace.
 
-## Decision
+All applications submitting messages to this service will need to follow this specification.
 
-We will use the following submission message specification:
+All messages submitted following this specification should be successfully parsed and processed by the DSpace Submission Service. Note that this does not guarantee the submission will be successfully added to DSpace.
+
+Messages that do not follow this specification will be rejected and sent to the result queue with a useful error message for the submitting application to handle.
+
+By having the submitting application be responsible for telling this service what
+output queue it expects to read messages back from, it allows for the service to scale
+up more easily with less (or hopefully no) custom code per submitting service.
+
+## Specification
 
 Each SQS Message sent to the dspace-submission-service submit queue will
 contain two components, MessageAttributes and MessageBody.
 
 ### MessageAttributes
 
-[Important: See Updated MessageAttributes in 6. Submission message spec](0006-submission-message-spec.md)
-
 MessageAttributes is a JSON object containing one item, PackageID, structured
 like so:
 
-```
+```json
 MessageAttributes = {
     "PackageID": {
         "DataType": "String",
@@ -45,6 +40,11 @@ MessageAttributes = {
             consistent for each submitting system (should not change over
             time).>"
 
+    },
+    "OutputQueue": {
+      "DataType": "String",
+      "StringValue": "<Name of the pre-agreed upon output SQS queue to be used for the submitting system. The queue must
+          already exist and both systems must have appropriate access to the queue.>"
     }
 }
 ```
@@ -81,11 +81,3 @@ MessageBody = {
     ]
 }
 ```
-
-## Consequences
-
-All applications submitting messages to this service will need to follow this specification.
-
-All messages submitted following this specification should be successfully parsed and processed by the DSpace Submission Service. Note that this does not guarantee the submission will be successfully added to DSpace.
-
-Messages that do not follow this specification will be rejected and sent to the result queue with a useful error message for the submitting application to handle.
