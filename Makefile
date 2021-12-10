@@ -24,8 +24,19 @@ publish: dist ## Build, tag and push
 	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest
 	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:`git describe --always`
 
+promote: ## Promote the current staging build to production
+	docker login -u AWS -p $$(aws ecr get-login-password --region us-east-1) $(ECR_REGISTRY)
+	docker pull $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest
+	docker tag $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest $(ECR_REGISTRY)/dspacesubmissionservice-prod:latest
+	docker tag $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest $(ECR_REGISTRY)/dspacesubmissionservice-prod:$(DATETIME)
+	docker push $(ECR_REGISTRY)/dspacesubmissionservice-prod:latest
+	docker push $(ECR_REGISTRY)/dspacesubmissionservice-prod:$(DATETIME)
+
 run-stage:  ## Runs the task in stage - see readme for more info
 	aws ecs run-task --cluster dspacesubmissionservice-stage --task-definition dspacesubmissionservice-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-0744a5c9beeb49a20],securityGroups=[sg-06b90b77a06e5870a],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
+
+run-prod: ##Runs the task in prod - see readme for more info
+	aws ecs run-task --cluster dspacesubmissionservice-prod --task-definition dspacesubmissionservice-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-0744a5c9beeb49a20],securityGroups=[sg-0b29d571e70c05101],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
 
 lint: bandit black flake8 isort ## Runs all linters
 
