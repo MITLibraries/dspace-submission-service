@@ -1,7 +1,7 @@
 from submitter import message
 
 
-def test_generate_messages_from_file():
+def test_generate_submission_messages_from_file():
     messages = message.generate_submission_messages_from_file(
         "tests/fixtures/completely-fake-data.json", "empty_output_queue"
     )
@@ -18,6 +18,33 @@ def test_generate_messages_from_file():
             "Files": [
                 {"BitstreamName": "file 1", "FileLocation": "s3:/fakeloc2/f.json"},
             ],
+        },
+    )
+
+
+def test_generate_result_messages_from_file():
+    messages = message.generate_result_messages_from_file(
+        "tests/fixtures/completely-fake-data.json", "empty_output_queue"
+    )
+    assert next(messages) == (
+        {
+            "PackageID": {"DataType": "String", "StringValue": "123"},
+            "SubmissionSource": {"DataType": "String", "StringValue": "ETD"},
+        },
+        {
+            "Bitstreams": [
+                {
+                    "BitstreamChecksum": {
+                        "checkSumAlgorithm": "MD5",
+                        "value": "2800ec8c99c60f5b15520beac9939a46",
+                    },
+                    "BitstreamName": "f.json",
+                    "BitstreamUUID": "abcdefg",
+                }
+            ],
+            "ItemHandle": "123456/67890",
+            "ResultType": "success",
+            "lastModified": "Thu Sep 09 17: 56: 39 UTC 2021",
         },
     )
 

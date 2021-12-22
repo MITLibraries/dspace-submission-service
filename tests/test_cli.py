@@ -3,7 +3,7 @@ from click.testing import CliRunner
 from submitter.cli import main
 
 
-def test_cli_load_sample_data(mocked_sqs):
+def test_cli_load_sample_input_data(mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
 
     sqs_messages = queue.receive_messages()
@@ -13,9 +13,30 @@ def test_cli_load_sample_data(mocked_sqs):
     result = runner.invoke(
         main,
         [
-            "load-sample-data",
+            "load-sample-input-data",
             "--input-queue",
             "empty_input_queue",
+            "--output-queue",
+            "empty_result_queue",
+        ],
+    )
+    assert result.exit_code == 0
+
+    sqs_messages = queue.receive_messages()
+    assert len(sqs_messages) > 0
+
+
+def test_cli_load_sample_output_data(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_result_queue")
+
+    sqs_messages = queue.receive_messages()
+    assert len(sqs_messages) == 0
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "load-sample-output-data",
             "--output-queue",
             "empty_result_queue",
         ],
