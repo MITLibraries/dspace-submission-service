@@ -34,12 +34,16 @@ Set env variables in `.env` file as needed:
   external libraries whose debug logs may have more information
 - DSS_LOG_LEVEL: level for logging, defaults to INFO. Can be useful to set to DEBUG for
   more detailed logging
+- DSS_OUTPUT_QUEUES: comma-separated string list of valid output queues, defaults to
+  "output". Update if using a different name for the output queue(s) in development
+- DSS_S3_BUCKET_NAMES: comma-separated string list of any S3 buckets needed to retrieve
+  files referenced in input messages (e.g. content files and JSON metadata files), only
+  needed if doing a permissions check
 - SKIP_PROCESSING: skips the publishing process for messages, defaults to "true". Can
   be useful for working on just the SQS components of the application. Set to "false"
   if messages should be processed and published
 - SQS_ENDPOINT_URL: needed if using Moto for local development (see section below)
-- DSS_OUTPUT_QUEUES": comma-separated string list of valid output queues, defaults to
-  "output". Update if using a different name for the output queue(s) in development
+
 
 ### Using Moto for local SQS queues
 
