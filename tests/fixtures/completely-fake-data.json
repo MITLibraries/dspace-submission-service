@@ -5,23 +5,41 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
-        {
-          "name": "file 1",
-          "location": "s3:/fakeloc2/f.json"
+      {
+        "name": "file 1",
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
         }
-      ]
-    },
+      }
+    ]
+  },
   "message 2": {
     "package id": "466",
     "source": "ETD",
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -31,10 +49,19 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -44,10 +71,19 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -57,10 +93,19 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -70,10 +115,19 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -83,10 +137,19 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -96,10 +159,19 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -109,10 +181,19 @@
     "target system": "DSpace@MIT",
     "collection handle": "1721.1/131022",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   },
@@ -122,10 +203,19 @@
     "target system": "devnull",
     "collection handle": "whatever",
     "metadata location": "s3:/fakeloc/a.json",
+    "result": "success",
+    "handle": "123456/67890",
+    "modified": "Thu Sep 09 17: 56: 39 UTC 2021",
     "files": [
       {
         "name": "file 1",
-        "location": "s3:/fakeloc2/f.json"
+        "location": "s3:/fakeloc2/f.json",
+        "bitstream name": "f.json",
+        "uuid": "abcdefg",
+        "checksum": {
+          "value": "2800ec8c99c60f5b15520beac9939a46",
+          "checkSumAlgorithm": "MD5"
+        }
       }
     ]
   }

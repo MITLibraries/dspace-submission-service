@@ -3,7 +3,10 @@ import logging
 import click
 
 from submitter import CONFIG
-from submitter.message import generate_submission_messages_from_file
+from submitter.message import (
+    generate_result_messages_from_file,
+    generate_submission_messages_from_file,
+)
 from submitter.s3 import check_s3_permissions
 from submitter.sqs import (
     check_read_permissions,
@@ -53,7 +56,7 @@ def start(queue, wait):
     default="tests/fixtures/completely-fake-data.json",
     help="Path to json file of sample messages to load",
 )
-def load_sample_data(input_queue, output_queue, filepath):
+def load_sample_input_data(input_queue, output_queue, filepath):
     logger.info(f"Loading sample data from file '{filepath}' into queue {input_queue}")
     count = 0
     messages = generate_submission_messages_from_file(filepath, output_queue)
@@ -61,6 +64,29 @@ def load_sample_data(input_queue, output_queue, filepath):
         write_message_to_queue(message[0], message[1], input_queue)
         count += 1
     logger.info(f"{count} messages loaded into queue {input_queue}")
+
+
+@main.command()
+@click.option(
+    "-o",
+    "--output-queue",
+    help="Name of queue to load sample messages to",
+)
+@click.option(
+    "-f",
+    "--filepath",
+    type=click.Path(exists=True),
+    default="tests/fixtures/completely-fake-data.json",
+    help="Path to json file of sample messages to load",
+)
+def load_sample_output_data(output_queue, filepath):
+    logger.info(f"Loading sample data from file '{filepath}' into queue {output_queue}")
+    count = 0
+    messages = generate_result_messages_from_file(filepath, output_queue)
+    for message in messages:
+        write_message_to_queue(message[0], message[1], output_queue)
+        count += 1
+    logger.info(f"{count} messages loaded into queue {output_queue}")
 
 
 @main.command()
