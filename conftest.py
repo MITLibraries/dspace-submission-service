@@ -5,7 +5,7 @@ import boto3
 import pytest
 import requests_mock
 from dspace import DSpaceClient
-from moto import mock_sqs, mock_ssm
+from moto import mock_iam, mock_s3, mock_sqs, mock_ssm
 from requests import exceptions
 
 
@@ -15,8 +15,40 @@ def aws_credentials():
     os.environ["AWS_ACCESS_KEY_ID"] = "testing"
     os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
     os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
+
+
+@pytest.fixture()
+def test_aws_user(aws_credentials):
+    with mock_iam():
+        user_name = "test-user"
+        policy_document = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": ["s3:ListBucket", "sqs:GetQueueUrl"],
+                    "Resource": "*",
+                },
+                {
+                    "Effect": "Deny",
+                    "Action": [
+                        "s3:GetObject",
+                        "sqs:ReceiveMessage",
+                        "sqs:SendMessage",
+                        "ssm:GetParameter",
+                    ],
+                    "Resource": "*",
+                },
+            ],
+        }
+        client = boto3.client("iam", region_name="us-east-1")
+        client.create_user(UserName=user_name)
+        client.put_user_policy(
+            UserName=user_name,
+            PolicyName="policy1",
+            PolicyDocument=json.dumps(policy_document),
+        )
+        yield client.create_access_key(UserName="test-user")["AccessKey"]
 
 
 @pytest.fixture(scope="function")
@@ -122,7 +154,7 @@ def mocked_ssm(aws_credentials):
             Type="String",
         )
         ssm.put_parameter(
-            Name="/test/example/SQS_dss_input_queue",
+            Name="/test/example/dss_input_queue",
             Value="empty_input_queue",
             Type="String",
         )
@@ -137,16 +169,37 @@ def mocked_ssm(aws_credentials):
             Type="String",
         )
         ssm.put_parameter(
-            Name="/test/example/sentry_dsn",
-            Value="http://12345.6789.sentry",
-            Type="String",
-        )
-        ssm.put_parameter(
             Name="/test/example/dss_output_queues",
             Value="test_output_1,test_output_2",
             Type="StringList",
         )
+        ssm.put_parameter(
+            Name="/test/example/dss_s3_bucket_arns",
+            Value="arn:aws:s3:::test-bucket-01,arn:aws:s3:::test-bucket-02",
+            Type="StringList",
+        )
+        ssm.put_parameter(
+            Name="/test/example/secure",
+            Value="true",
+            Type="SecureString",
+        )
+        ssm.put_parameter(
+            Name="/test/example/sentry_dsn",
+            Value="http://12345.6789.sentry",
+            Type="String",
+        )
         yield ssm
+
+
+@pytest.fixture()
+def mocked_s3(aws_credentials):
+    with mock_s3():
+        s3 = boto3.client("s3")
+        s3.create_bucket(
+            Bucket="test-bucket",
+        )
+        s3.put_object(Bucket="test-bucket", Key="object1", Body="I am an object.")
+        yield s3
 
 
 @pytest.fixture(scope="function")

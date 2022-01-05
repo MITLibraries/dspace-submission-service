@@ -39,7 +39,7 @@ class Config:
                 ssm.get_parameter_value(self.SSM_PATH + "dspace_timeout")
             )
             self.INPUT_QUEUE = ssm.get_parameter_value(
-                self.SSM_PATH + "SQS_dss_input_queue"
+                self.SSM_PATH + "dss_input_queue"
             )
             self.LOG_FILTER = ssm.get_parameter_value(
                 self.SSM_PATH + "dss_log_filter"
@@ -47,6 +47,12 @@ class Config:
             self.LOG_LEVEL = ssm.get_parameter_value(
                 self.SSM_PATH + "dss_log_level"
             ).upper()
+
+            bucket_arns = ssm.get_parameter_value(
+                self.SSM_PATH + "dss_s3_bucket_arns"
+            ).split(",")
+            self.S3_BUCKETS = [bucket.split(":")[-1] for bucket in bucket_arns]
+
             self.SENTRY_DSN = ssm.get_parameter_value(self.SSM_PATH + "sentry_dsn")
             self.SKIP_PROCESSING = "false"
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
@@ -61,6 +67,7 @@ class Config:
             self.INPUT_QUEUE = "test_queue_with_messages"
             self.LOG_FILTER = "true"
             self.LOG_LEVEL = os.getenv("DSS_LOG_LEVEL", "INFO").upper()
+            self.S3_BUCKETS = ["test-bucket"]
             self.SENTRY_DSN = None
             self.SKIP_PROCESSING = "false"
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
@@ -73,9 +80,10 @@ class Config:
             self.INPUT_QUEUE = os.getenv("DSS_INPUT_QUEUE")
             self.LOG_FILTER = os.getenv("DSS_LOG_FILTER", "true").lower()
             self.LOG_LEVEL = os.getenv("DSS_LOG_LEVEL", "INFO").upper()
+            self.S3_BUCKETS = os.getenv("DSS_S3_BUCKET_NAMES", "no-bucket").split(",")
             self.SENTRY_DSN = os.getenv("DSS_SENTRY_DSN")
-            self.SKIP_PROCESSING = os.environ.get("SKIP_PROCESSING", "false").lower()
-            self.SQS_ENDPOINT_URL = os.environ.get("SQS_ENDPOINT_URL")
+            self.SKIP_PROCESSING = os.getenv("SKIP_PROCESSING", "false").lower()
+            self.SQS_ENDPOINT_URL = os.getenv("SQS_ENDPOINT_URL")
             self.VALID_RESULT_QUEUES = os.getenv("DSS_OUTPUT_QUEUES", "output").split(
                 ","
             )

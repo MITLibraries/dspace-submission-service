@@ -1,9 +1,15 @@
 import json
+import os
+import time
 
+import boto3
 import pytest
 from botocore.exceptions import ClientError
+from moto.core import set_initial_no_auth_action_count
 
 from submitter.sqs import (
+    check_read_permissions,
+    check_write_permissions,
     create,
     message_loop,
     process,
@@ -130,3 +136,46 @@ def test_verify_returns_false(mocked_sqs, raw_attributes, raw_body):
         MessageBody=json.dumps(raw_body),
     )
     assert verify_sent_message({"body": "a different message body"}, response) is False
+
+
+def test_check_read_permissions_success(mocked_sqs):
+    result = check_read_permissions("input_queue_with_messages")
+    assert result == "Read permissions confirmed for queue 'input_queue_with_messages'"
+
+
+@set_initial_no_auth_action_count(0)
+def test_check_read_permissions_raises_error(mocked_sqs, test_aws_user):
+    os.environ["AWS_ACCESS_KEY_ID"] = test_aws_user["AccessKeyId"]
+    os.environ["AWS_SECRET_ACCESS_KEY"] = test_aws_user["SecretAccessKey"]
+    boto3.setup_default_session()
+    with pytest.raises(ClientError) as e:
+        check_read_permissions("input_queue_with_messages")
+    assert (
+        "User: arn:aws:iam::123456789012:user/test-user is not authorized to perform: "
+        "sqs:ReceiveMessage"
+    ) in str(e.value)
+
+
+def test_check_write_permissions(mocked_sqs):
+    initial_messages = retrieve_messages_from_queue("input_queue_with_messages", 0, 2)
+    assert len(initial_messages) == 10
+
+    result = check_write_permissions("input_queue_with_messages")
+    assert result == "Write permissions confirmed for queue 'input_queue_with_messages'"
+
+    time.sleep(3)
+    subsequent_messages = retrieve_messages_from_queue("input_queue_with_messages", 0)
+    assert len(subsequent_messages) == 10
+
+
+@set_initial_no_auth_action_count(0)
+def test_check_write_permissions_raises_error(mocked_sqs, test_aws_user):
+    os.environ["AWS_ACCESS_KEY_ID"] = test_aws_user["AccessKeyId"]
+    os.environ["AWS_SECRET_ACCESS_KEY"] = test_aws_user["SecretAccessKey"]
+    boto3.setup_default_session()
+    with pytest.raises(ClientError) as e:
+        check_write_permissions("empty_input_queue")
+    assert (
+        "User: arn:aws:iam::123456789012:user/test-user is not authorized to perform: "
+        "sqs:SendMessage"
+    ) in str(e.value)
