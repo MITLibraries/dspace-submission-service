@@ -4,9 +4,12 @@ Date: 2021-08-25
 
 ## Status
 
-Accepted
-
 Amended by [6. Submission message spec](0006-submission-message-spec.md)
+
+Superceded by [8. Move message specifications](0008-move-specifications.md)
+
+See [Submission Message Specification](../specifications/submission-message-specification.md)
+for current version of this spec.
 
 ## Context
 

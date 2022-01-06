@@ -4,7 +4,10 @@ Date: 2021-08-30
 
 ## Status
 
-Accepted
+Superceded by [8. Move message specifications](0008-move-specifications.md)
+
+See [Metadata JSON Specification](../specifications/metadata-json-specification.md)
+for current version of this spec.
 
 ## Context
 

@@ -4,7 +4,10 @@ Date: 2021-09-10
 
 ## Status
 
-Accepted
+Superceded by [8. Move message specifications](0008-move-specifications.md)
+
+See [Result Message Specification](../specifications/result-message-specification.md)
+for current version of this spec.
 
 ## Context
 
