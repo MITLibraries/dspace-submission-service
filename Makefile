@@ -11,7 +11,7 @@ install: ## Install dependencies, including dev dependencies
 	pipenv install --dev
 
 dist: ## Build docker container
-	docker build -t $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest \
+	docker build --platform linux/amd64 -t $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest \
 		-t $(ECR_REGISTRY)/dspacesubmissionservice-stage:`git describe --always` \
 		-t submitter:latest .	
 
