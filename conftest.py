@@ -5,7 +5,7 @@ import boto3
 import pytest
 import requests_mock
 from dspace import DSpaceClient
-from moto import mock_iam, mock_s3, mock_sqs, mock_ssm
+from moto import mock_iam, mock_s3, mock_sqs
 from requests import exceptions
 
 
@@ -35,7 +35,6 @@ def test_aws_user(aws_credentials):
                         "s3:GetObject",
                         "sqs:ReceiveMessage",
                         "sqs:SendMessage",
-                        "ssm:GetParameter",
                     ],
                     "Resource": "*",
                 },
@@ -127,68 +126,6 @@ def mocked_sqs(aws_credentials):
             MessageBody="Doesn't conform to the DSS spec",
         )
         yield sqs
-
-
-@pytest.fixture(scope="function")
-def mocked_ssm(aws_credentials):
-    with mock_ssm():
-        ssm = boto3.client("ssm")
-        ssm.put_parameter(
-            Name="/test/example/dspace_api_url",
-            Value="mock://dspace.edu/rest/",
-            Type="String",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dspace_user",
-            Value="test",
-            Type="String",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dspace_password",
-            Value="test",
-            Type="SecureString",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dspace_timeout",
-            Value="3.0",
-            Type="String",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dss_input_queue",
-            Value="empty_input_queue",
-            Type="String",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dss_log_filter",
-            Value="False",
-            Type="String",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dss_log_level",
-            Value="info",
-            Type="String",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dss_output_queues",
-            Value="test_output_1,test_output_2",
-            Type="StringList",
-        )
-        ssm.put_parameter(
-            Name="/test/example/dss_s3_bucket_arns",
-            Value="arn:aws:s3:::test-bucket-01,arn:aws:s3:::test-bucket-02",
-            Type="StringList",
-        )
-        ssm.put_parameter(
-            Name="/test/example/secure",
-            Value="true",
-            Type="SecureString",
-        )
-        ssm.put_parameter(
-            Name="/test/example/sentry_dsn",
-            Value="http://12345.6789.sentry",
-            Type="String",
-        )
-        yield ssm
 
 
 @pytest.fixture()
@@ -451,6 +388,25 @@ def raw_body():
             },
         ],
     }
+
+
+@pytest.fixture(autouse=True)
+def test_env():
+    os.environ = {
+        "WORKSPACE": "test",
+        "DSPACE_API_URL": "mock://dspace.edu/rest/",
+        "DSPACE_USER": "test",
+        "DSPACE_PASSWORD": "test",  # nosec
+        "DSPACE_TIMEOUT": 3.0,
+        "INPUT_QUEUE": "input_queue",
+        "LOG_FILTER": "false",
+        "LOG_LEVEL": "INFO",
+        "SENTRY_DSN": "mock://12345.6789.sentry",
+        "SKIP_PROCESSING": "true",
+        "SQS_ENDPOINT_URL": "https://sqs.us-east-1.amazonaws.com/",
+        "OUTPUT_QUEUES": "output_queue_1,output_queue_2",
+    }
+    yield
 
 
 item_post_response_01 = {

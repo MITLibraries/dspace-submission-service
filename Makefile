@@ -1,65 +1,83 @@
-.PHONY: install dist update
-SHELL=/bin/bash
-DATETIME:=$(shell date -u +%Y%m%dT%H%M%SZ)
-ECR_REGISTRY=672626379771.dkr.ecr.us-east-1.amazonaws.com
+### This is the Terraform-generated header for dspace-submission-service-dev. If  ###
+###   this is a Lambda repo, uncomment the FUNCTION line below  ###
+###   and review the other commented lines in the document.     ###
+ECR_NAME_DEV:=dspace-submission-service-dev
+ECR_URL_DEV:=222053980223.dkr.ecr.us-east-1.amazonaws.com/dspace-submission-service-dev
+# FUNCTION_DEV:=
+### End of Terraform-generated header                            ###
 
-help: ## Print this message
-	@awk 'BEGIN { FS = ":.*##"; print "Usage:  make <target>\n\nTargets:" } \
-/^[-_[:alpha:]]+:.?*##/ { printf "  %-15s%s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+### Terraform-generated Developer Deploy Commands for Dev environment ###
+dist-dev: ## Build docker container (intended for developer-based manual build)
+	docker build --platform linux/amd64 \
+	    -t $(ECR_URL_DEV):latest \
+		-t $(ECR_URL_DEV):`git describe --always` \
+		-t $(ECR_NAME_DEV):latest .
 
-install: ## Install dependencies, including dev dependencies
+publish-dev: dist-dev ## Build, tag and push (intended for developer-based manual publish)
+	docker login -u AWS -p $$(aws ecr get-login-password --region us-east-1) $(ECR_URL_DEV)
+	docker push $(ECR_URL_DEV):latest
+	docker push $(ECR_URL_DEV):`git describe --always`
+
+### If this is a Lambda repo, uncomment the two lines below     ###
+# update-lambda-dev: ## Updates the lambda with whatever is the most recent image in the ecr (intended for developer-based manual update)
+#	aws lambda update-function-code --function-name $(FUNCTION_DEV) --image-uri $(ECR_URL_DEV):latest
+
+
+### Terraform-generated manual shortcuts for deploying to Stage. This requires  ###
+###   that ECR_NAME_STAGE, ECR_URL_STAGE, and FUNCTION_STAGE environment        ###
+###   variables are set locally by the developer and that the developer has     ###
+###   authenticated to the correct AWS Account. The values for the environment  ###
+###   variables can be found in the stage_build.yml caller workflow.            ###
+dist-stage: ## Only use in an emergency
+	docker build --platform linux/amd64 \
+	    -t $(ECR_URL_STAGE):latest \
+		-t $(ECR_URL_STAGE):`git describe --always` \
+		-t $(ECR_NAME_STAGE):latest .
+
+publish-stage: ## Only use in an emergency
+	docker login -u AWS -p $$(aws ecr get-login-password --region us-east-1) $(ECR_URL_STAGE)
+	docker push $(ECR_URL_STAGE):latest
+	docker push $(ECR_URL_STAGE):`git describe --always`
+
+### If this is a Lambda repo, uncomment the two lines below     ###
+# update-lambda-stage: ## Updates the lambda with whatever is the most recent image in the ecr (intended for developer-based manual update)
+#	aws lambda update-function-code --function-name $(FUNCTION_STAGE) --image-uri $(ECR_URL_STAGE):latest
+
+run-dev:  ## Runs the task in dev - see readme for more info
+	aws ecs run-task --cluster DSS-SubmissionService-dev --task-definition DSS-SubmissionService-dev-task --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
+
+run-stage:  ## Runs the task in stage - see readme for more info
+	aws ecs run-task --cluster DSS-SubmissionService-stage --task-definition DSS-SubmissionService-stage-task --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
+
+### Dependency commands ###
+install: ## Install script and dependencies
 	pipenv install --dev
-
-dist: ## Build docker container
-	docker build --platform linux/amd64 -t $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest \
-		-t $(ECR_REGISTRY)/dspacesubmissionservice-stage:`git describe --always` \
-		-t submitter:latest .	
 
 update: install ## Update all Python dependencies
 	pipenv clean
 	pipenv update --dev
 
-publish: dist ## Build, tag and push
-	docker login -u AWS -p $$(aws ecr get-login-password --region us-east-1) $(ECR_REGISTRY)
-	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest
-	docker push $(ECR_REGISTRY)/dspacesubmissionservice-stage:`git describe --always`
 
-promote: ## Promote the current staging build to production
-	docker login -u AWS -p $$(aws ecr get-login-password --region us-east-1) $(ECR_REGISTRY)
-	docker pull $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest
-	docker tag $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest $(ECR_REGISTRY)/dspacesubmissionservice-prod:latest
-	docker tag $(ECR_REGISTRY)/dspacesubmissionservice-stage:latest $(ECR_REGISTRY)/dspacesubmissionservice-prod:$(DATETIME)
-	docker push $(ECR_REGISTRY)/dspacesubmissionservice-prod:latest
-	docker push $(ECR_REGISTRY)/dspacesubmissionservice-prod:$(DATETIME)
-
-check-permissions-stage: ## Check infrastructure permissions on the staging deplpyment
-	aws ecs run-task --cluster dspacesubmissionservice-stage --task-definition dspacesubmissionservice-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-0744a5c9beeb49a20],securityGroups=[sg-06b90b77a06e5870a],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [{"name": "DSS","command": ["check-permissions"]}]}'
-
-check-permissions-prod: ## Check infrastructure permissions on the prod deplpyment
-	aws ecs run-task --cluster dspacesubmissionservice-prod --task-definition dspacesubmissionservice-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-0744a5c9beeb49a20],securityGroups=[sg-0b29d571e70c05101],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [{"name": "DSS","command": ["check-permissions"]}]}'
-
-run-stage:  ## Runs the task in stage - see readme for more info
-	aws ecs run-task --cluster dspacesubmissionservice-stage --task-definition dspacesubmissionservice-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-0744a5c9beeb49a20],securityGroups=[sg-06b90b77a06e5870a],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
-
-run-prod: ##Runs the task in prod - see readme for more info
-	aws ecs run-task --cluster dspacesubmissionservice-prod --task-definition dspacesubmissionservice-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-0744a5c9beeb49a20],securityGroups=[sg-0b29d571e70c05101],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
-
-lint: bandit black flake8 isort ## Runs all linters
-
-bandit: ## Security oriented static analyser for python code
-	pipenv run bandit -r submitter
-
-black: ## The Uncompromising Code Formatter
-	pipenv run black --check --diff .
-
-flake8: ## Tool For Style Guide Enforcement
-	pipenv run flake8 .
-
-isort: ## isort your imports, so you don't have to
-	pipenv run isort . --diff
-
-test: ## runs pytest
-	pipenv run pytest --cov=submitter --cov-report html:cov_html
+### Testing commands ###
+test: ## Run tests and print a coverage report
+	pipenv run coverage run --source=submitter -m pytest -vv
+	pipenv run coverage report -m
 
 coveralls: test
-	pipenv run coveralls
+	pipenv run coverage lcov -o ./coverage/lcov.info
+
+
+### Linting commands ###
+lint: bandit black flake8 isort ## Lint the repo
+
+bandit:
+	pipenv run bandit -r submitter
+
+black:
+	pipenv run black --check --diff .
+
+flake8:
+	pipenv run flake8 .
+
+isort:
+	pipenv run isort . --diff

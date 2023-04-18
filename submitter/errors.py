@@ -178,7 +178,7 @@ class SubmitMessageInvalidResultQueueError(Exception):
             f"while processing message '{message_id}' from input queue "
             f"'{CONFIG.INPUT_QUEUE}'. Message provided invalid result queue name "
             f"'{result_queue}'. Valid result queue names are: "
-            f"{CONFIG.VALID_RESULT_QUEUES}."
+            f"{CONFIG.OUTPUT_QUEUES}."
         )
 
 
