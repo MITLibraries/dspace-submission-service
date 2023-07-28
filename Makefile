@@ -49,6 +49,9 @@ run-dev:  ## Runs the task in dev - see readme for more info
 run-stage:  ## Runs the task in stage - see readme for more info
 	aws ecs run-task --cluster DSS-SubmissionService-stage --task-definition DSS-SubmissionService-stage-task --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
 
+# run-prod: ## Runs the task in stage - see readme for more info
+#   Not yet deployed in production
+
 ### Dependency commands ###
 install: ## Install script and dependencies
 	pipenv install --dev

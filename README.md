@@ -13,7 +13,7 @@ Clone the repo and install the dependencies using [Pipenv](https://docs.pipenv.o
 ```bash
 git clone git@github.com:MITLibraries/dspace-submission-service.git
 cd dspace-submission-service
-pipenv install --dev
+make install
 pipenv run submitter --help
 ```
 
@@ -57,8 +57,6 @@ While this provides local SQS queues, please note it does not provide local DSpa
 
 ### Local development with DSpace
 
-[Please insert instructions here!!]
-
 If you are just interested in testing SQS aspects of the application, you can bypass
 DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env`
 file.
@@ -87,17 +85,14 @@ more messages are returned from the input queue
 
 ## Docker
 
+Note: The application requires being run with `WORKSPACE` env variable set to an environment (`dev`, `stage`, or `prod`). Use credentials from the `dss-management-sso-policy` for the desired environment in order to access the necessary AWS resources.
+
 ```bash
-make dist
+make dist-<environment>
 docker run submitter:latest --
 ```
 
-note: the application requires being run in an environment with Roles based access to the AWS resources. in addition, the environment must have the WORKSPACE variable set according to stage and prod conventions.
-
 ## Makefile Info
-### run-stage
-Run-stage is outputted by the terraform used to create the infrastructure and copy/pasted here for convenience.
-Calling run-stage will execute the latest version of the container in the stage environment using the MITVPC.
+The `Makefile` contains commands for running the application in the `dev`, `stage`, and `prod` environments as an ECS task. 
 
-### run-prod 
-run-prod is just like run-stage, except it runs the prod infrastructure version
+The commands are produced by the Terraform used to create the infrastructure and copy/pasted here for convenience. Calling each command will execute the latest version of the container in the specified environment.
