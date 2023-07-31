@@ -48,7 +48,7 @@ class Submission:
         result_queue = message.message_attributes.get("OutputQueue", {}).get(
             "StringValue", None
         )
-        if result_queue not in CONFIG.VALID_RESULT_QUEUES:
+        if result_queue not in CONFIG.OUTPUT_QUEUES:
             raise errors.SubmitMessageInvalidResultQueueError(
                 message.message_id, result_queue
             )

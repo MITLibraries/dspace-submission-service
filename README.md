@@ -13,7 +13,7 @@ Clone the repo and install the dependencies using [Pipenv](https://docs.pipenv.o
 ```bash
 git clone git@github.com:MITLibraries/dspace-submission-service.git
 cd dspace-submission-service
-pipenv install --dev
+make install
 pipenv run submitter --help
 ```
 
@@ -27,18 +27,15 @@ Set env variables in `.env` file as needed:
 - DSPACE_USER: only needed if publishing to DSpace
 - DSPACE_PASSWORD: only needed if publishing to DSpace
 - DSPACE_TIMEOUT: only needed if publishing to DSpace, defaults to 120 seconds
-- DSS_INPUT_QUEUE: input message queue to use for development (see section below on
+- INPUT_QUEUE: input message queue to use for development (see section below on
   using Moto for local SQS queues)
-- DSS_LOG_FILTER: filters out logs from external libraries, defaults to "true".
+- LOG_FILTER: filters out logs from external libraries, defaults to "true".
   Can be useful to set this to "false" if there are errors that seem to involve
   external libraries whose debug logs may have more information
-- DSS_LOG_LEVEL: level for logging, defaults to INFO. Can be useful to set to DEBUG for
+- LOG_LEVEL: level for logging, defaults to INFO. Can be useful to set to DEBUG for
   more detailed logging
-- DSS_OUTPUT_QUEUES: comma-separated string list of valid output queues, defaults to
+- OUTPUT_QUEUES: comma-separated string list of valid output queues, defaults to
   "output". Update if using a different name for the output queue(s) in development
-- DSS_S3_BUCKET_NAMES: comma-separated string list of any S3 buckets needed to retrieve
-  files referenced in input messages (e.g. content files and JSON metadata files), only
-  needed if doing a permissions check
 - SKIP_PROCESSING: skips the publishing process for messages, defaults to "true". Can
   be useful for working on just the SQS components of the application. Set to "false"
   if messages should be processed and published
@@ -59,8 +56,6 @@ To use, start moto running sqs in standalone mode with `pipenv run moto_server`,
 While this provides local SQS queues, please note it does not provide local DSpace so you currently still need to use the test server and real credentials.
 
 ### Local development with DSpace
-
-[Please insert instructions here!!]
 
 If you are just interested in testing SQS aspects of the application, you can bypass
 DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env`
@@ -90,17 +85,14 @@ more messages are returned from the input queue
 
 ## Docker
 
+Note: The application requires being run with `WORKSPACE` env variable set to an environment (`dev`, `stage`, or `prod`). Use credentials from the `dss-management-sso-policy` for the desired environment in order to access the necessary AWS resources.
+
 ```bash
-make dist
+make dist-<environment>
 docker run submitter:latest --
 ```
 
-note: the application requires being run in an environment with Roles based access to the AWS resources. in addition, the environment must have WORKSPACE and SSM_PATH variables set according to stage and prod conventions.
-
 ## Makefile Info
-### run-stage
-Run-stage is outputted by the terraform used to create the infrastructure and copy/pasted here for convenience.
-Calling run-stage will execute the latest version of the container in the stage environment using the MITVPC.
+The `Makefile` contains commands for running the application in the `dev`, `stage`, and `prod` environments as an ECS task. 
 
-### run-prod 
-run-prod is just like run-stage, except it runs the prod infrastructure version
+The commands are produced by the Terraform used to create the infrastructure and copy/pasted here for convenience. Calling each command will execute the latest version of the container in the specified environment.
