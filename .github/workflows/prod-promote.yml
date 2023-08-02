@@ -1,0 +1,19 @@
+### This is the Terraform-generated prod-promote.yml workflow for the                         ###
+### dspace-submission-service-prod repository.                                                ###
+name: Prod Container Promote
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    name: Prod Container Promote
+    uses: mitlibraries/.github/.github/workflows/ecr-shared-promote-prod.yml@main
+    secrets: inherit
+    with:
+      AWS_REGION: "us-east-1"
+      GHA_ROLE_STAGE: dspace-submission-service-gha-stage
+      GHA_ROLE_PROD: dspace-submission-service-gha-prod
+      ECR_STAGE: "dspace-submission-service-stage"
+      ECR_PROD: "dspace-submission-service-prod"
