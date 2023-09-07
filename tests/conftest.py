@@ -96,6 +96,13 @@ def mocked_dspace():
 
 
 @pytest.fixture(scope="function")
+def mocked_dspace_auth_failure():
+    with requests_mock.Mocker() as m:
+        m.post("mock://dspace.edu/rest/login", status_code=401)
+        yield m
+
+
+@pytest.fixture(scope="function")
 def mocked_sqs(aws_credentials):
     with mock_sqs():
         sqs = boto3.resource("sqs")
