@@ -1,6 +1,8 @@
 import logging
 
 import click
+from dspace.client import DSpaceClient
+from requests.exceptions import HTTPError
 
 from submitter import CONFIG
 from submitter.message import (
@@ -87,3 +89,22 @@ def create_queue(name):
     """Create queue with NAME supplied as argument"""
     queue = create(name)
     logger.info(queue.url)
+
+
+@main.command()
+def verify_dspace_connection():
+    client = DSpaceClient(CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT)
+    try:
+        client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
+    except HTTPError:
+        logger.exception(
+            "Failed to authenticate to %s as %s",
+            CONFIG.DSPACE_API_URL,
+            CONFIG.DSPACE_USER,
+        )
+    else:
+        logger.info(
+            "Successfully authenticated to %s as %s",
+            CONFIG.DSPACE_API_URL,
+            CONFIG.DSPACE_USER,
+        )

@@ -77,6 +77,9 @@ integration testing with DSpace test, add an additional option to the command:
 Warning: please do not run this against the production system or a bunch of junk records
 will load into dspace
 
+## Verifying DSpace connection
+To verify that DSS can connect to the DSpace REST API, run `make verify-dspace-connection` and view the logs to see if the connection was successful or failed.
+
 ## Processing
 
 `pipenv run submitter start` will loop through all of the data in the SQS input queue, process the queue,
