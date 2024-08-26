@@ -4,6 +4,7 @@ import traceback
 import pytest
 from dspace import Bitstream, Item
 from freezegun import freeze_time
+from requests.exceptions import RequestException
 
 from submitter import errors
 from submitter.submission import Submission, prettify
@@ -180,4 +181,27 @@ def test_submit_bitstream_post_dspace_error(
     assert submission.result_message["ErrorInfo"] == (
         "Error occurred while posting bitstream 'test-file-01.pdf' to item in DSpace. "
         "Item '0000/item02' and any bitstreams already posted to it will be deleted"
+    )
+
+
+def test_submit_dspace_unknown_api_error_logs_exception_and_raises_error(
+    caplog,
+    mocked_dspace,
+    test_client,
+    input_message_item_post_dspace_generic_500_error,
+):
+    submission = Submission.from_message(
+        input_message_item_post_dspace_generic_500_error
+    )
+    with pytest.raises(RequestException):
+        submission.submit(test_client)
+    # assert actual encountered exception is logged (for debugging purposes)
+    assert (
+        "Catastrophic error before or during request!  No response to parse."
+        in caplog.text
+    )
+    # assert unhandled exception encountered in submit flow logged
+    assert (
+        "Unexpected exception, aborting DSpace Submission Service processing"
+        in caplog.text
     )

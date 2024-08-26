@@ -52,6 +52,15 @@ def test_aws_user(aws_credentials):
 
 @pytest.fixture(scope="function")
 def mocked_dspace():
+    """The following mock responses from DSpace based on the URL of the request.
+
+    Fixtures below that prepare an SQS message, where specific collections or bitstreams
+    are included, will utilize these mocked responses from DSpace.
+
+    EXAMPLE: fixture 'input_message_item_post_dspace_timeout' sets collection
+    "CollectionHandle: 0000/collection03".  This aligns with a URL defined here, and will
+    therefore throw a requests.exceptions.ConnectTimeout exception to test against.
+    """
     with requests_mock.Mocker() as m:
         m.post(
             "mock://dspace.edu/rest/login",
@@ -68,6 +77,12 @@ def mocked_dspace():
         m.get(
             "mock://dspace.edu/rest/handle/0000/collection03",
             exc=exceptions.ConnectTimeout,
+        )
+        m.get(
+            "mock://dspace.edu/rest/handle/0000/collection04",
+            exc=exceptions.RequestException(
+                "Catastrophic error before or during request!  No response to parse."
+            ),
         )
         m.get(
             "mock://dspace.edu/rest/handle/0000/not-a-collection",
@@ -339,6 +354,30 @@ def input_message_bitstream_file_open_error(mocked_sqs):
                         "FileLocation": "tests/fixtures/nothing-here",
                         "BitstreamDescription": "No file",
                     },
+                ],
+            }
+        ),
+    )
+    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
+    yield message
+
+
+@pytest.fixture
+def input_message_item_post_dspace_generic_500_error(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
+    queue.send_message(
+        MessageAttributes=test_attributes,
+        MessageBody=json.dumps(
+            {
+                "SubmissionSystem": "DSpace@MIT",
+                "CollectionHandle": "0000/collection04",
+                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
+                "Files": [
+                    {
+                        "BitstreamName": "test-file-01.pdf",
+                        "FileLocation": "tests/fixtures/test-file-01.pdf",
+                        "BitstreamDescription": "A test bitstream",
+                    }
                 ],
             }
         ),
