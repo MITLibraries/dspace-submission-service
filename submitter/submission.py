@@ -188,7 +188,7 @@ class Submission:
             self.result_error_message(e.message, getattr(e, "dspace_error", None))
             clean_up_partial_success(client, item)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Unexpected exception, aborting DSpace Submission Service processing"
             )
             raise e
