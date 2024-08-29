@@ -1,4 +1,4 @@
-FROM python:3.9-slim as build
+FROM python:3.12-slim as build
 WORKDIR /app
 COPY . .
 RUN cd /app && python setup.py bdist_wheel

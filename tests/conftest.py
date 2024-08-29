@@ -5,7 +5,7 @@ import boto3
 import pytest
 import requests_mock
 from dspace import DSpaceClient
-from moto import mock_iam, mock_s3, mock_sqs
+from moto import mock_aws
 from requests import exceptions
 
 
@@ -19,7 +19,7 @@ def aws_credentials():
 
 @pytest.fixture()
 def test_aws_user(aws_credentials):
-    with mock_iam():
+    with mock_aws():
         user_name = "test-user"
         policy_document = {
             "Version": "2012-10-17",
@@ -119,7 +119,7 @@ def mocked_dspace_auth_failure():
 
 @pytest.fixture(scope="function")
 def mocked_sqs(aws_credentials):
-    with mock_sqs():
+    with mock_aws():
         sqs = boto3.resource("sqs")
         sqs.create_queue(QueueName="empty_input_queue")
         sqs.create_queue(QueueName="empty_result_queue")
@@ -152,7 +152,7 @@ def mocked_sqs(aws_credentials):
 
 @pytest.fixture()
 def mocked_s3(aws_credentials):
-    with mock_s3():
+    with mock_aws():
         s3 = boto3.client("s3")
         s3.create_bucket(
             Bucket="test-bucket",

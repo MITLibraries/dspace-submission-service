@@ -11,10 +11,7 @@ sentry-sdk = "*"
 smart-open = "*"
 
 [dev-packages]
-flake8 = "*"
 black = "*"
-isort = "*"
-bandit = "*"
 moto = {extras = ["s3", "server", "sqs"], version = "*"}
 pytest = "*"
 coveralls = "*"
@@ -23,9 +20,12 @@ pytest-cov = "*"
 pytest-env = "*"
 freezegun = "*"
 coverage = "*"
+ruff = "*"
+safety = "*"
+pre-commit = "*"
 
 [requires]
-python_version = "3.9"
+python_version = "3.12"
 
 [scripts]
 submitter = "python -c \"from submitter.cli import main; main()\""

@@ -132,3 +132,5 @@ dmypy.json
 cov_html
 .vscode/
 .idea/
+
+output/
