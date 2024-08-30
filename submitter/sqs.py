@@ -103,9 +103,7 @@ def create(name):
     return queue
 
 
-def verify_sent_message(
-    sent_message_body: dict, sqs_send_message_response: dict
-) -> bool:
+def verify_sent_message(sent_message_body: dict, sqs_send_message_response: dict) -> bool:
     body_md5 = hashlib.md5(  # nosec
         json.dumps(sent_message_body).encode("utf-8")
     ).hexdigest()

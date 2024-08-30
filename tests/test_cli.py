@@ -86,8 +86,7 @@ def test_verify_dspace_connection_success(mocked_dspace, caplog):
         )
         assert result.exit_code == 0
         assert (
-            "Successfully authenticated to mock://dspace.edu/rest/ as test"
-            in caplog.text
+            "Successfully authenticated to mock://dspace.edu/rest/ as test" in caplog.text
         )
 
 

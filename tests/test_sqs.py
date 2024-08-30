@@ -28,8 +28,7 @@ def test_create(mocked_sqs):
     with pytest.raises(ClientError) as e:
         c.get_queue_by_name(QueueName=test_queue)
         assert (
-            e.value.response["Error"]["Code"]
-            == "AWS.SimpleQueueService.NonExistentQueue"
+            e.value.response["Error"]["Code"] == "AWS.SimpleQueueService.NonExistentQueue"
         )
 
     # create queue

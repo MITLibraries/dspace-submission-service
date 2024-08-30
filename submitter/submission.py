@@ -59,9 +59,7 @@ class Submission:
                 "SubmissionSource": message.message_attributes["SubmissionSource"],
             }
         except KeyError as e:
-            raise errors.SubmitMessageMissingAttributeError(
-                message.message_id, e.args[0]
-            )
+            raise errors.SubmitMessageMissingAttributeError(message.message_id, e.args[0])
 
         try:
             body = json.loads(message.body)
