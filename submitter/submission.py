@@ -1,14 +1,21 @@
+from collections.abc import Iterator
 import json
 import logging
 import sys
 import traceback
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import dspace
+from dspace.client import DSpaceClient
 import requests
 import smart_open
 
 from submitter import CONFIG, errors
+
+if TYPE_CHECKING:
+    from mypy_boto3_sqs.service_resource import Message
+    from mypy_boto3_sqs.type_defs import MessageAttributeValueExtraOutputTypeDef
 
 logger = logging.getLogger(__name__)
 
@@ -16,14 +23,14 @@ logger = logging.getLogger(__name__)
 class Submission:
     def __init__(
         self,
-        attributes,
-        result_queue,
-        result_message=None,
-        destination=None,
-        collection_handle=None,
-        metadata_location=None,
-        files=None,
-    ):
+        attributes: dict,
+        result_queue: str,
+        result_message: dict | None = None,
+        destination: str | None = None,
+        collection_handle: str | None = None,
+        metadata_location: str | None = None,
+        files: list[dict] | None = None,
+    ) -> None:
         self.destination = destination
         self.collection_handle = collection_handle
         self.metadata_location = metadata_location
@@ -33,7 +40,7 @@ class Submission:
         self.result_queue = result_queue
 
     @classmethod
-    def from_message(cls, message):
+    def from_message(cls, message: "Message") -> "Submission":
         """
         Create a submission with all necessary publishing data from a submit message.
 
@@ -44,11 +51,12 @@ class Submission:
             SubmitMessageInvalidResultQueueError
             SubmitMessageMissingAttributeError
         """
-        result_message = None
-        result_queue = message.message_attributes.get("OutputQueue", {}).get(
-            "StringValue", None
+        output_queue: MessageAttributeValueExtraOutputTypeDef | dict = (
+            message.message_attributes.get("OutputQueue", {})
         )
-        if result_queue not in CONFIG.OUTPUT_QUEUES:
+        result_queue = output_queue.get("StringValue")
+
+        if not result_queue or result_queue not in CONFIG.OUTPUT_QUEUES:
             raise errors.SubmitMessageInvalidResultQueueError(
                 message.message_id, result_queue
             )
@@ -87,7 +95,7 @@ class Submission:
             result_queue=result_queue,
         )
 
-    def create_item(self):
+    def create_item(self) -> dspace.item.Item:
         """Create item instance with metadata entries from submission message."""
         try:
             logger.debug("Creating local item instance from submission message")
@@ -99,13 +107,13 @@ class Submission:
         except KeyError as e:
             raise errors.ItemCreateError(self.metadata_location) from e
 
-    def get_metadata_entries_from_file(self):
+    def get_metadata_entries_from_file(self) -> Iterator[dict]:
         with smart_open.open(self.metadata_location) as f:
             metadata = json.load(f)
             for entry in metadata["metadata"]:
                 yield entry
 
-    def add_bitstreams_to_item(self, item):
+    def add_bitstreams_to_item(self, item: dspace.item.Item) -> dspace.item.Item:
         """Add bitstreams to item from files in submission message."""
         try:
             logger.debug(
@@ -122,7 +130,9 @@ class Submission:
         except KeyError as e:
             raise errors.BitstreamAddError() from e
 
-    def result_error_message(self, message, dspace_response=None):
+    def result_error_message(
+        self, message: "Message", dspace_response: str | None = None
+    ) -> None:
         time = datetime.now()
         tb = traceback.format_exception(*sys.exc_info())
         self.result_message = {
@@ -133,7 +143,7 @@ class Submission:
             "ExceptionTraceback": prettify(tb),
         }
 
-    def result_success_message(self, item):
+    def result_success_message(self, item: dspace.item.Item) -> None:
         self.result_message = {
             "ResultType": "success",
             "ItemHandle": item.handle,
@@ -150,7 +160,7 @@ class Submission:
                 }
             )
 
-    def submit(self, client):
+    def submit(self, client: DSpaceClient) -> None:
         """Submit a submission to DSpace as a new item with associated bitstreams.
 
         Creates a local item instance from the submission message, adds bitstream
@@ -192,7 +202,11 @@ class Submission:
             raise e
 
 
-def post_item(client, item, collection_handle):
+def post_item(
+    client: DSpaceClient,
+    item: dspace.item.Item,
+    collection_handle: str,
+) -> None:
     """Post item with metadata to DSpace."""
     try:
         entries = [entry.to_dict() for entry in item.metadata]
@@ -208,7 +222,7 @@ def post_item(client, item, collection_handle):
         raise errors.ItemPostError(e, collection_handle) from e
 
 
-def post_bitstreams(client, item):
+def post_bitstreams(client: DSpaceClient, item: dspace.item.Item) -> None:
     """Post all bitstreams to an existing DSpace item."""
     logger.debug(
         "Posting %d bitstream(s) to item '%s' in DSpace",
@@ -230,7 +244,7 @@ def post_bitstreams(client, item):
             raise errors.BitstreamPostError(e, bitstream.name, item.handle) from e
 
 
-def clean_up_partial_success(client, item):
+def clean_up_partial_success(client: DSpaceClient, item: dspace.item.Item) -> None:
     logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
     handle = item.handle
     for bitstream in item.bitstreams:
@@ -242,7 +256,7 @@ def clean_up_partial_success(client, item):
     logger.info("Item '%s' deleted from DSpace", handle)
 
 
-def prettify(traceback: list):
+def prettify(traceback: list) -> list[str]:
     output = []
     for item in traceback:
         lines = item.strip().split("\n")

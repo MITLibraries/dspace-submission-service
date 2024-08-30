@@ -57,7 +57,7 @@ class BitstreamAddError(Exception):
         message (str): Explanation of the error
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.message = (
             "Error occurred while parsing bitstream information from files listed in "
             "submission message."

@@ -24,6 +24,8 @@ ruff = "*"
 safety = "*"
 pre-commit = "*"
 mypy = "*"
+types-requests = "*"
+boto3-stubs = {extras = ["essential"], version = "*"}
 
 [requires]
 python_version = "3.12"
