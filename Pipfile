@@ -23,6 +23,7 @@ coverage = "*"
 ruff = "*"
 safety = "*"
 pre-commit = "*"
+mypy = "*"
 
 [requires]
 python_version = "3.12"
