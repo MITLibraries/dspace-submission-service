@@ -97,7 +97,9 @@ def retrieve_messages_from_queue(
 
 
 def write_message_to_queue(
-    attributes: dict, body: dict, output_queue: str
+    attributes: dict,
+    body: dict | str | None,
+    output_queue: str,
 ) -> "SendMessageResultTypeDef":
     sqs = sqs_client()
     queue = sqs.get_queue_by_name(QueueName=output_queue)
@@ -114,7 +116,10 @@ def create(name: str) -> "Queue":
     return queue
 
 
-def verify_sent_message(sent_message_body: dict, sqs_send_message_response: dict) -> bool:
+def verify_sent_message(
+    sent_message_body: dict | str | None,
+    sqs_send_message_response: "SendMessageResultTypeDef",
+) -> bool:
     body_md5 = hashlib.md5(  # nosec
         json.dumps(sent_message_body).encode("utf-8")
     ).hexdigest()

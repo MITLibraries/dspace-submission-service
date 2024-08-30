@@ -15,7 +15,6 @@ from submitter import CONFIG, errors
 
 if TYPE_CHECKING:
     from mypy_boto3_sqs.service_resource import Message
-    from mypy_boto3_sqs.type_defs import MessageAttributeValueExtraOutputTypeDef
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,8 @@ class Submission:
         self,
         attributes: dict,
         result_queue: str,
-        result_message: dict | None = None,
+        *,
+        result_message: dict | str | None = None,
         destination: str | None = None,
         collection_handle: str | None = None,
         metadata_location: str | None = None,
@@ -51,11 +51,9 @@ class Submission:
             SubmitMessageInvalidResultQueueError
             SubmitMessageMissingAttributeError
         """
-        output_queue: MessageAttributeValueExtraOutputTypeDef | dict = (
-            message.message_attributes.get("OutputQueue", {})
-        )
-        result_queue = output_queue.get("StringValue")
-
+        result_queue = message.message_attributes.get(  # type: ignore[call-overload]
+            "OutputQueue", {}
+        ).get("StringValue")
         if not result_queue or result_queue not in CONFIG.OUTPUT_QUEUES:
             raise errors.SubmitMessageInvalidResultQueueError(
                 message.message_id, result_queue
@@ -81,18 +79,18 @@ class Submission:
                 f"body provided was: '{message.body}'"
             )
             return cls(
-                attributes=attributes,
-                result_queue=result_queue,
+                attributes,
+                result_queue,
                 result_message=result_message,
             )
 
         return cls(
+            attributes,
+            result_queue,
             destination=destination,
             collection_handle=collection_handle,
             metadata_location=metadata_location,
             files=files,
-            attributes=attributes,
-            result_queue=result_queue,
         )
 
     def create_item(self) -> dspace.item.Item:
@@ -119,7 +117,7 @@ class Submission:
             logger.debug(
                 "Adding bitstreams to local item instance from submission message"
             )
-            for file in self.files:
+            for file in self.files or []:
                 bitstream = dspace.bitstream.Bitstream(
                     file_path=file["FileLocation"],
                     name=file["BitstreamName"],
@@ -131,8 +129,9 @@ class Submission:
             raise errors.BitstreamAddError() from e
 
     def result_error_message(
-        self, message: "Message", dspace_response: str | None = None
+        self, message: str, dspace_response: str | None = None
     ) -> None:
+        """Set result message on Submission object on submit error."""
         time = datetime.now()
         tb = traceback.format_exception(*sys.exc_info())
         self.result_message = {
@@ -144,6 +143,7 @@ class Submission:
         }
 
     def result_success_message(self, item: dspace.item.Item) -> None:
+        """Set result message on Submission object on successful submit."""
         self.result_message = {
             "ResultType": "success",
             "ItemHandle": item.handle,
@@ -205,7 +205,7 @@ class Submission:
 def post_item(
     client: DSpaceClient,
     item: dspace.item.Item,
-    collection_handle: str,
+    collection_handle: str | None,
 ) -> None:
     """Post item with metadata to DSpace."""
     try:
