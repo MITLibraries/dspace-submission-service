@@ -1,3 +1,5 @@
+# ruff: noqa: PT004, S105
+
 import json
 import os
 
@@ -9,7 +11,7 @@ from moto import mock_aws
 from requests import exceptions
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def aws_credentials():
     """Mocked AWS Credentials for moto."""
     os.environ["AWS_ACCESS_KEY_ID"] = "testing"
@@ -17,7 +19,7 @@ def aws_credentials():
     os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
 
 
-@pytest.fixture()
+@pytest.fixture
 def test_aws_user(aws_credentials):
     with mock_aws():
         user_name = "test-user"
@@ -50,7 +52,7 @@ def test_aws_user(aws_credentials):
         yield client.create_access_key(UserName="test-user")["AccessKey"]
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mocked_dspace():
     """The following mock responses from DSpace based on the URL of the request.
 
@@ -110,21 +112,21 @@ def mocked_dspace():
         yield m
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mocked_dspace_auth_failure():
     with requests_mock.Mocker() as m:
         m.post("mock://dspace.edu/rest/login", status_code=401)
         yield m
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mocked_sqs(aws_credentials):
     with mock_aws():
         sqs = boto3.resource("sqs")
         sqs.create_queue(QueueName="empty_input_queue")
         sqs.create_queue(QueueName="empty_result_queue")
         queue = sqs.create_queue(QueueName="input_queue_with_messages")
-        for i in range(11):
+        for _i in range(11):
             queue.send_message(
                 MessageAttributes=test_attributes,
                 MessageBody=json.dumps(
@@ -150,7 +152,7 @@ def mocked_sqs(aws_credentials):
         yield sqs
 
 
-@pytest.fixture()
+@pytest.fixture
 def mocked_s3(aws_credentials):
     with mock_aws():
         s3 = boto3.client("s3")
@@ -161,11 +163,11 @@ def mocked_s3(aws_credentials):
         yield s3
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def test_client(mocked_dspace):
     client = DSpaceClient("mock://dspace.edu/rest/")
     client.login("test", "test")
-    yield client
+    return client
 
 
 @pytest.fixture
@@ -188,8 +190,7 @@ def input_message_good(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -199,8 +200,7 @@ def input_message_nonconforming_body(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody="Doesn't conform to the DSS spec",
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -217,8 +217,7 @@ def input_message_invalid_queue(mocked_sqs):
         },
         MessageBody="irrelevant",
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -234,8 +233,7 @@ def input_message_missing_attribute(mocked_sqs):
         },
         MessageBody="irrelevant",
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -258,8 +256,7 @@ def input_message_item_create_error(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -281,8 +278,7 @@ def input_message_bitstream_create_error(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -305,8 +301,7 @@ def input_message_item_post_error(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -329,8 +324,7 @@ def input_message_item_post_dspace_timeout(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -358,8 +352,7 @@ def input_message_bitstream_file_open_error(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -382,8 +375,7 @@ def input_message_item_post_dspace_generic_500_error(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
@@ -406,18 +398,17 @@ def input_message_bitstream_dspace_post_error(mocked_sqs):
             }
         ),
     )
-    message = queue.receive_messages(MessageAttributeNames=["All"])[0]
-    yield message
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
 
 
 @pytest.fixture
 def raw_attributes():
-    yield test_attributes
+    return test_attributes
 
 
 @pytest.fixture
 def raw_body():
-    yield {
+    return {
         "SubmissionSystem": "DSpace@MIT",
         "CollectionHandle": "0000/collection01",
         "MetadataLocation": "tests/fixtures/test-item-metadata.json",
@@ -437,22 +428,19 @@ def raw_body():
 
 
 @pytest.fixture(autouse=True)
-def test_env():
-    os.environ = {
-        "WORKSPACE": "test",
-        "DSPACE_API_URL": "mock://dspace.edu/rest/",
-        "DSPACE_USER": "test",
-        "DSPACE_PASSWORD": "test",  # nosec
-        "DSPACE_TIMEOUT": 3.0,
-        "INPUT_QUEUE": "input_queue",
-        "LOG_FILTER": "false",
-        "LOG_LEVEL": "INFO",
-        "SENTRY_DSN": "mock://12345.6789.sentry",
-        "SKIP_PROCESSING": "true",
-        "SQS_ENDPOINT_URL": "https://sqs.us-east-1.amazonaws.com/",
-        "OUTPUT_QUEUES": "output_queue_1,output_queue_2",
-    }
-    yield
+def test_env(monkeypatch):
+    monkeypatch.setenv("WORKSPACE", "test")
+    monkeypatch.setenv("DSPACE_API_URL", "mock://dspace.edu/rest/")
+    monkeypatch.setenv("DSPACE_USER", "test")
+    monkeypatch.setenv("DSPACE_PASSWORD", "test")
+    monkeypatch.setenv("DSPACE_TIMEOUT", "3.0")
+    monkeypatch.setenv("INPUT_QUEUE", "input_queue")
+    monkeypatch.setenv("LOG_FILTER", "false")
+    monkeypatch.setenv("LOG_LEVEL", "INFO")
+    monkeypatch.setenv("SENTRY_DSN", "mock://12345.6789.sentry")
+    monkeypatch.setenv("SKIP_PROCESSING", "true")
+    monkeypatch.setenv("SQS_ENDPOINT_URL", "https://sqs.us-east-1.amazonaws.com/")
+    monkeypatch.setenv("OUTPUT_QUEUES", "output_queue_1,output_queue_2")
 
 
 item_post_response_01 = {

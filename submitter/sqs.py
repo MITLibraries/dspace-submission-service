@@ -17,13 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 def sqs_client() -> "SQSServiceResource":
-    sqs = boto3.resource(
+    return boto3.resource(
         service_name="sqs",
         region_name=CONFIG.AWS_REGION_NAME,
         endpoint_url=CONFIG.SQS_ENDPOINT_URL,
     )
-
-    return sqs
 
 
 def message_loop(queue: str, wait: int, visibility: int = 30) -> None:
@@ -103,24 +101,22 @@ def write_message_to_queue(
 ) -> "SendMessageResultTypeDef":
     sqs = sqs_client()
     queue = sqs.get_queue_by_name(QueueName=output_queue)
-    response = queue.send_message(
+    return queue.send_message(
         MessageAttributes=attributes,
         MessageBody=json.dumps(body),
     )
-    return response
 
 
 def create(name: str) -> "Queue":
     sqs = sqs_client()
-    queue = sqs.create_queue(QueueName=name)
-    return queue
+    return sqs.create_queue(QueueName=name)
 
 
 def verify_sent_message(
     sent_message_body: dict | str | None,
     sqs_send_message_response: "SendMessageResultTypeDef",
 ) -> bool:
-    body_md5 = hashlib.md5(  # nosec
+    body_md5 = hashlib.md5(  # nosec # noqa: S324
         json.dumps(sent_message_body).encode("utf-8")
     ).hexdigest()
     return body_md5 == sqs_send_message_response["MD5OfMessageBody"]

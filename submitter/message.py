@@ -1,5 +1,5 @@
-from collections.abc import Iterator
 import json
+from collections.abc import Iterator
 
 
 def generate_submission_messages_from_file(
@@ -8,14 +8,14 @@ def generate_submission_messages_from_file(
     with open(filepath) as file:
         messages = json.load(file)
 
-    for message_name, message_json in messages.items():
+    for message_json in messages.values():
         attributes = attributes_from_json(message_json, output_queue)
         body = body_from_json(message_json)
         yield attributes, body
 
 
 def attributes_from_json(message_json: dict, output_queue: str) -> dict:
-    attributes = {
+    return {
         "PackageID": {
             "DataType": "String",
             "StringValue": message_json["package id"],
@@ -29,7 +29,6 @@ def attributes_from_json(message_json: dict, output_queue: str) -> dict:
             "StringValue": output_queue,
         },
     }
-    return attributes
 
 
 def body_from_json(message_json: dict) -> dict:
@@ -55,14 +54,14 @@ def generate_result_messages_from_file(
     with open(filepath) as file:
         messages = json.load(file)
 
-    for message_name, message_json in messages.items():
+    for message_json in messages.values():
         attributes = result_attributes_from_json(message_json)
         body = result_body_from_json(message_json)
         yield attributes, body
 
 
 def result_attributes_from_json(message_json: dict) -> dict:
-    attributes = {
+    return {
         "PackageID": {
             "DataType": "String",
             "StringValue": message_json["package id"],
@@ -72,7 +71,6 @@ def result_attributes_from_json(message_json: dict) -> dict:
             "StringValue": message_json["source"],
         },
     }
-    return attributes
 
 
 def result_body_from_json(message_json: dict) -> dict:

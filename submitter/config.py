@@ -8,11 +8,13 @@ class Config:
     def __init__(self) -> None:
         try:
             self.ENV = os.environ["WORKSPACE"]
-        except KeyError as e:
-            print("Env variable 'WORKSPACE' is required, please set it and try again.")
-            raise e
+        except KeyError:
+            logger.error(  # noqa: TRY400
+                "Env variable 'WORKSPACE' is required, please set it and try again."
+            )
+            raise
         self.AWS_REGION_NAME = "us-east-1"
-        print(f"Configuring dspace-submission-service for env={self.ENV}")
+        logger.info(f"Configuring dspace-submission-service for env={self.ENV}")
         self.load_config_variables(self.ENV)
 
     def load_config_variables(self, env: str) -> None:
@@ -33,7 +35,7 @@ class Config:
         if env == "test":
             self.DSPACE_API_URL = "mock://dspace.edu/rest/"
             self.DSPACE_USER = "test"
-            self.DSPACE_PASSWORD = "test"  # nosec
+            self.DSPACE_PASSWORD = "test"  # nosec # noqa: S105
             self.DSPACE_TIMEOUT = 3.0
             self.INPUT_QUEUE = "test_queue_with_messages"
             self.LOG_FILTER = "true"

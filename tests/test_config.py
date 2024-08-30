@@ -1,3 +1,5 @@
+# ruff: noqa: S105, PLR2004
+
 import os
 
 import pytest

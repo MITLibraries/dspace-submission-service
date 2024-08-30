@@ -1,15 +1,15 @@
-from collections.abc import Iterator
 import json
 import logging
 import sys
 import traceback
-from datetime import datetime
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import dspace
-from dspace.client import DSpaceClient
 import requests
 import smart_open
+from dspace.client import DSpaceClient
 
 from submitter import CONFIG, errors
 
@@ -65,7 +65,9 @@ class Submission:
                 "SubmissionSource": message.message_attributes["SubmissionSource"],
             }
         except KeyError as e:
-            raise errors.SubmitMessageMissingAttributeError(message.message_id, e.args[0])
+            raise errors.SubmitMessageMissingAttributeError(
+                message.message_id, e.args[0]
+            ) from e
 
         try:
             body = json.loads(message.body)
@@ -95,28 +97,25 @@ class Submission:
 
     def create_item(self) -> dspace.item.Item:
         """Create item instance with metadata entries from submission message."""
+        logger.debug("Creating local item instance from submission message")
+        item = dspace.item.Item()
         try:
-            logger.debug("Creating local item instance from submission message")
-            item = dspace.item.Item()
             for entry in self.get_metadata_entries_from_file():
                 metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
                 item.metadata.append(metadata_entry)
-            return item
         except KeyError as e:
             raise errors.ItemCreateError(self.metadata_location) from e
+        return item
 
     def get_metadata_entries_from_file(self) -> Iterator[dict]:
         with smart_open.open(self.metadata_location) as f:
             metadata = json.load(f)
-            for entry in metadata["metadata"]:
-                yield entry
+        yield from metadata["metadata"]
 
     def add_bitstreams_to_item(self, item: dspace.item.Item) -> dspace.item.Item:
         """Add bitstreams to item from files in submission message."""
+        logger.debug("Adding bitstreams to local item instance from submission message")
         try:
-            logger.debug(
-                "Adding bitstreams to local item instance from submission message"
-            )
             for file in self.files or []:
                 bitstream = dspace.bitstream.Bitstream(
                     file_path=file["FileLocation"],
@@ -124,15 +123,15 @@ class Submission:
                     description=file.get("BitstreamDescription"),
                 )
                 item.bitstreams.append(bitstream)
-            return item
         except KeyError as e:
-            raise errors.BitstreamAddError() from e
+            raise errors.BitstreamAddError from e
+        return item
 
     def result_error_message(
         self, message: str, dspace_response: str | None = None
     ) -> None:
         """Set result message on Submission object on submit error."""
-        time = datetime.now()
+        time = datetime.now(tz=UTC)
         tb = traceback.format_exception(*sys.exc_info())
         self.result_message = {
             "ResultType": "error",
@@ -195,11 +194,11 @@ class Submission:
         except (errors.BitstreamOpenError, errors.BitstreamPostError) as e:
             self.result_error_message(e.message, getattr(e, "dspace_error", None))
             clean_up_partial_success(client, item)
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Unexpected exception, aborting DSpace Submission Service processing"
             )
-            raise e
+            raise
 
 
 def post_item(
@@ -216,8 +215,8 @@ def post_item(
         )
         item.post(client, collection_handle=collection_handle)
         logger.debug("Posted item to Dspace with handle '%s'", item.handle)
-    except requests.exceptions.Timeout as e:
-        raise e
+    except requests.exceptions.Timeout:
+        raise
     except requests.exceptions.HTTPError as e:
         raise errors.ItemPostError(e, collection_handle) from e
 
