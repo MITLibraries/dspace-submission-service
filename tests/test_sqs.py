@@ -1,3 +1,5 @@
+# ruff: noqa: PLR2004
+
 import json
 
 import pytest
@@ -18,7 +20,7 @@ def test_sqs_client_returns_sqs_resource():
     sqs = sqs_client()
     type_as_string = type(sqs).__name__
 
-    assert "sqs.ServiceResource" == type_as_string
+    assert type_as_string == "sqs.ServiceResource"
 
 
 def test_create(mocked_sqs):
@@ -27,17 +29,14 @@ def test_create(mocked_sqs):
     c = sqs_client()
     with pytest.raises(ClientError) as e:
         c.get_queue_by_name(QueueName=test_queue)
-        assert (
-            e.value.response["Error"]["Code"]
-            == "AWS.SimpleQueueService.NonExistentQueue"
-        )
+    assert e.value.response["Error"]["Code"] == "AWS.SimpleQueueService.NonExistentQueue"
 
     # create queue
     create(test_queue)
 
     # confirm queue exists
     q = c.get_queue_by_name(QueueName=test_queue)
-    assert "sqs.Queue" == type(q).__name__
+    assert type(q).__name__ == "sqs.Queue"
 
 
 def test_retrieve_messages_from_queue(mocked_sqs):

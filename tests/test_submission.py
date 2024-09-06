@@ -190,9 +190,7 @@ def test_submit_dspace_unknown_api_error_logs_exception_and_raises_error(
     test_client,
     input_message_item_post_dspace_generic_500_error,
 ):
-    submission = Submission.from_message(
-        input_message_item_post_dspace_generic_500_error
-    )
+    submission = Submission.from_message(input_message_item_post_dspace_generic_500_error)
     with pytest.raises(RequestException):
         submission.submit(test_client)
     # assert actual encountered exception is logged (for debugging purposes)

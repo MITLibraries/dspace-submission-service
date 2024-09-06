@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @click.group()
-def main():
+def main() -> None:
     pass
 
 
@@ -24,7 +24,7 @@ def main():
     "--queue", default=CONFIG.INPUT_QUEUE, help="Name of queue to process messages from"
 )
 @click.option("--wait", default=20, help="seconds to wait for long polling. max 20")
-def start(queue, wait):
+def start(queue: str, wait: int) -> None:
     logger.info("Starting processing messages from queue %s", queue)
     message_loop(queue, wait)
     logger.info("Completed processing messages from queue %s", queue)
@@ -50,7 +50,7 @@ def start(queue, wait):
     default="tests/fixtures/completely-fake-data.json",
     help="Path to json file of sample messages to load",
 )
-def load_sample_input_data(input_queue, output_queue, filepath):
+def load_sample_input_data(input_queue: str, output_queue: str, filepath: str) -> None:
     logger.info(f"Loading sample data from file '{filepath}' into queue {input_queue}")
     count = 0
     messages = generate_submission_messages_from_file(filepath, output_queue)
@@ -73,7 +73,7 @@ def load_sample_input_data(input_queue, output_queue, filepath):
     default="tests/fixtures/completely-fake-data.json",
     help="Path to json file of sample messages to load",
 )
-def load_sample_output_data(output_queue, filepath):
+def load_sample_output_data(output_queue: str, filepath: str) -> None:
     logger.info(f"Loading sample data from file '{filepath}' into queue {output_queue}")
     count = 0
     messages = generate_result_messages_from_file(filepath, output_queue)
@@ -85,14 +85,14 @@ def load_sample_output_data(output_queue, filepath):
 
 @main.command()
 @click.argument("name")
-def create_queue(name):
+def create_queue(name: str) -> None:
     """Create queue with NAME supplied as argument"""
     queue = create(name)
     logger.info(queue.url)
 
 
 @main.command()
-def verify_dspace_connection():
+def verify_dspace_connection() -> None:
     client = DSpaceClient(CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT)
     try:
         client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)

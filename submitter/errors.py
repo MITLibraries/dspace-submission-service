@@ -6,6 +6,8 @@ Service.
 """
 import logging
 
+from requests.exceptions import RequestException
+
 from submitter import CONFIG
 
 logger = logging.getLogger(__name__)
@@ -23,7 +25,7 @@ class ItemCreateError(Exception):
 
     """
 
-    def __init__(self, metadata_file: str):
+    def __init__(self, metadata_file: str | None):
         self.message = (
             "Error occurred while creating item metadata entries from file "
             f"'{metadata_file}'"
@@ -42,12 +44,16 @@ class ItemPostError(Exception):
         dspace_error (str): Error message returned by the DSpace server
     """
 
-    def __init__(self, source_error: Exception, collection_handle: str):
+    def __init__(
+        self,
+        source_error: RequestException,
+        collection_handle: str | None,
+    ):
         self.message = (
             "Error occurred while posting item to DSpace collection "
             f"'{collection_handle}'"
         )
-        self.dspace_error = source_error.response.text
+        self.dspace_error = source_error.response.text if source_error.response else None
 
 
 class BitstreamAddError(Exception):
@@ -57,7 +63,7 @@ class BitstreamAddError(Exception):
         message (str): Explanation of the error
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.message = (
             "Error occurred while parsing bitstream information from files listed in "
             "submission message."
@@ -95,13 +101,18 @@ class BitstreamPostError(Exception):
         dspace_error (str): Error message returned by the DSpace server
     """
 
-    def __init__(self, source_error: Exception, bitstream_name: str, item_handle: str):
+    def __init__(
+        self,
+        source_error: RequestException,
+        bitstream_name: str,
+        item_handle: str,
+    ):
         self.message = (
             f"Error occurred while posting bitstream '{bitstream_name}' to item in "
             f"DSpace. Item '{item_handle}' and any bitstreams already posted to it "
             "will be deleted"
         )
-        self.dspace_error = source_error.response.text
+        self.dspace_error = source_error.response.text if source_error.response else None
 
 
 class DSpaceTimeoutError(Exception):
@@ -147,7 +158,7 @@ class SQSMessageSendError(Exception):
     def __init__(
         self,
         message_attributes: dict,
-        message_body: dict,
+        message_body: dict | str | None,
         result_queue: str,
         submit_message_id: str,
     ):
@@ -172,7 +183,7 @@ class SubmitMessageInvalidResultQueueError(Exception):
         message(str): Explanation of the error
     """
 
-    def __init__(self, message_id: str, result_queue: str):
+    def __init__(self, message_id: str, result_queue: str | None):
         self.message = (
             "Aborting DSS processing due to a non-recoverable error:\nError occurred "
             f"while processing message '{message_id}' from input queue "
