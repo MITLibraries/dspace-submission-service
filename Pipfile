@@ -26,6 +26,7 @@ pre-commit = "*"
 mypy = "*"
 types-requests = "*"
 boto3-stubs = {extras = ["essential"], version = "*"}
+pip-audit = "*"
 
 [requires]
 python_version = "3.12"
