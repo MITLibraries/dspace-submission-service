@@ -11,7 +11,7 @@ help: # Preview Makefile commands
 
 install: # Install Python dependencies
 	pipenv install --dev
-	pipenv run pre-commit install
+	uv run pre-commit install
 
 update: install # Update Python dependencies
 	pipenv clean
@@ -23,11 +23,11 @@ update: install # Update Python dependencies
 ######################
 
 test: # Run tests and print a coverage report
-	pipenv run coverage run --source=submitter -m pytest -vv
-	pipenv run coverage report -m
+	uv run coverage run --source=submitter -m pytest -vv
+	uv run coverage report -m
 
 coveralls: test # Write coverage data to an LCOV report
-	pipenv run coverage lcov -o ./coverage/lcov.info
+	uv run coverage lcov -o ./coverage/lcov.info
 
 
 ####################################
@@ -37,25 +37,24 @@ coveralls: test # Write coverage data to an LCOV report
 lint: black mypy ruff safety # Run linters
 
 black: # Run 'black' linter and print a preview of suggested changes
-	pipenv run black --check --diff .
+	uv run black --check --diff .
 
 mypy: # Run 'mypy' linter
-	pipenv run mypy .
+	uv run mypy .
 
 ruff: # Run 'ruff' linter and print a preview of errors
-	pipenv run ruff check .
+	uv run ruff check .
 
-safety: # Check for security vulnerabilities and verify Pipfile.lock is up-to-date
-	pipenv run pip-audit
-	pipenv verify
+safety: # Check for security vulnerabilities in dependencies
+	uv run pip-audit
 
 lint-apply: black-apply ruff-apply # Apply changes with 'black' and resolve 'fixable errors' with 'ruff'
 
 black-apply: # Apply changes with 'black'
-	pipenv run black .
+	uv run black .
 
 ruff-apply: # Resolve 'fixable errors' with 'ruff'
-	pipenv run ruff check --fix .
+	uv run ruff check --fix .
 
 ### This is the Terraform-generated header for dspace-submission-service-dev. If  ###
 ###   this is a Lambda repo, uncomment the FUNCTION line below  ###

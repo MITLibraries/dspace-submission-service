@@ -1,11 +1,53 @@
+[project]
+name = ""
+version = "0.0.1"
+requires-python = "~=3.12"
+dependencies = [
+    "click",
+    "boto3",
+    "dspace-python-client",
+    "sentry-sdk",
+    "smart-open",
+]
+
 [tool.black]
 line-length = 90
+
+[dependency-groups]
+dev = [
+    "black",
+    "moto[s3, server, sqs]",
+    "pytest",
+    "coveralls",
+    "requests-mock",
+    "pytest-cov",
+    "pytest-env",
+    "freezegun",
+    "coverage",
+    "ruff",
+    "safety",
+    "pre-commit",
+    "mypy",
+    "types-requests",
+    "boto3-stubs[essential]",
+    "pip-audit",
+]
 
 [tool.mypy]
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 exclude = ["tests/", "output/"]
 ignore_missing_imports = true
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+[tool.uv.sources]
+dspace-python-client = { git = "https://github.com/mitlibraries/dspace-python-client.git" }
 
 [tool.pytest.ini_options]
 log_level = "INFO"
