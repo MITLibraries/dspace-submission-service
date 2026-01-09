@@ -82,46 +82,20 @@ publish-dev: dist-dev ## Build, tag and push (intended for developer-based manua
 #	aws lambda update-function-code --function-name $(FUNCTION_DEV) --image-uri $(ECR_URL_DEV):latest
 
 
-### Terraform-generated manual shortcuts for deploying to Stage. This requires  ###
-###   that ECR_NAME_STAGE, ECR_URL_STAGE, and FUNCTION_STAGE environment        ###
-###   variables are set locally by the developer and that the developer has     ###
-###   authenticated to the correct AWS Account. The values for the environment  ###
-###   variables can be found in the stage_build.yml caller workflow.            ###
-dist-stage: ## Only use in an emergency
-	docker build --platform linux/amd64 \
-	    -t $(ECR_URL_STAGE):latest \
-		-t $(ECR_URL_STAGE):`git describe --always` \
-		-t $(ECR_NAME_STAGE):latest .
-
-publish-stage: ## Only use in an emergency
-	docker login -u AWS -p $$(aws ecr get-login-password --region us-east-1) $(ECR_URL_STAGE)
-	docker push $(ECR_URL_STAGE):latest
-	docker push $(ECR_URL_STAGE):`git describe --always`
-
-### If this is a Lambda repo, uncomment the two lines below     ###
-# update-lambda-stage: ## Updates the lambda with whatever is the most recent image in the ecr (intended for developer-based manual update)
-#	aws lambda update-function-code --function-name $(FUNCTION_STAGE) --image-uri $(ECR_URL_STAGE):latest
-
 run-dev:  ## Runs the task in dev - see readme for more info
-	aws ecs run-task --cluster DSS-SubmissionService-dev --task-definition DSS-SubmissionService-dev --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
+	aws ecs run-task --cluster dso-ecs-dev --task-definition dso-dss-dev --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
 
 verify-dspace-connection-dev: # Verify dev app can connect to DSpace
-	aws ecs run-task --cluster DSS-SubmissionService-dev --task-definition DSS-SubmissionService-dev --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "DSS", "command": ["verify-dspace-connection"]}]}'
+	aws ecs run-task --cluster dso-ecs-dev --task-definition dso-dss-dev --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "dso-dss-dev", "command": ["verify-dspace-connection"]}]}'
 
 run-stage:  ## Runs the task in stage - see readme for more info
-	aws ecs run-task --cluster DSS-SubmissionService-stage --task-definition DSS-SubmissionService-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
+	aws ecs run-task --cluster dso-ecs-stage --task-definition dso-dss-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
 
 verify-dspace-connection-stage: # Verify stage app can connect to DSpace
-	aws ecs run-task --cluster DSS-SubmissionService-stage --task-definition DSS-SubmissionService-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "DSS", "command": ["verify-dspace-connection"]}]}'
+	aws ecs run-task --cluster dso-ecs-stage --task-definition dso-dss-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "dso-dss-stage", "command": ["verify-dspace-connection"]}]}'
 
 run-prod:  ## Runs the task in prod - see readme for more info
-	aws ecs run-task --cluster DSS-SubmissionService-prod --task-definition DSS-SubmissionService-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-042726f373a7c5a79,subnet-05ab0e5c2bfcd748f],securityGroups=[sg-0325d8c490a870a90],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
+	aws ecs run-task --cluster dso-ecs-prod --task-definition dso-dss-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-042726f373a7c5a79,subnet-05ab0e5c2bfcd748f],securityGroups=[sg-0325d8c490a870a90],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
 
 verify-dspace-connection-prod: # Verify prod app can connect to DSpace
-	aws ecs run-task --cluster DSS-SubmissionService-prod --task-definition DSS-SubmissionService-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-042726f373a7c5a79,subnet-05ab0e5c2bfcd748f],securityGroups=[sg-0325d8c490a870a90],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "DSS", "command": ["verify-dspace-connection"]}]}'
-
-# run-prod: ## Runs the task in stage - see readme for more info
-#   Not yet deployed in production
-
-# verify-dspace-connection-prod: # Verify prod app can connect to DSpace
-# 	Not yet deployed in production
+	aws ecs run-task --cluster dso-ecs-prod --task-definition dso-dss-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-042726f373a7c5a79,subnet-05ab0e5c2bfcd748f],securityGroups=[sg-0325d8c490a870a90],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "dso-dss-prod", "command": ["verify-dspace-connection"]}]}'
