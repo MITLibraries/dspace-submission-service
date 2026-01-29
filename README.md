@@ -8,13 +8,13 @@ results to output queues.
 
 ## Development
 
-Clone the repo and install the dependencies using [Pipenv](https://docs.pipenv.org/):
+Clone the repo and install the dependencies using `make install`:
 
 ```bash
 git clone git@github.com:MITLibraries/dspace-submission-service.git
 cd dspace-submission-service
 make install
-pipenv run submitter --help
+uv run submitter --help
 ```
 
 The [Click documentation](https://click.palletsprojects.com/en/8.0.x/quickstart/)
@@ -46,12 +46,12 @@ Set env variables in `.env` file as needed:
 
 It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode(https://github.com/spulec/moto#stand-alone-server-mode)] rather than using true AWS SQS queues.
 
-To use, start moto running sqs in standalone mode with `pipenv run moto_server`, then:
+To use, start moto running sqs in standalone mode with `uv run moto_server`, then:
 
 - add `SQS_ENDPOINT_URL='http://localhost:5000'` to your `.env` file
 - create the queues you'd like to use
-  - pipenv run submitter create-queue YOUR_INPUT_QUEUE
-  - pipenv run submitter create-queue YOUR_OUTPUT_QUEUE
+  - uv run submitter create-queue YOUR_INPUT_QUEUE
+  - uv run submitter create-queue YOUR_OUTPUT_QUEUE
 
 While this provides local SQS queues, please note it does not provide local DSpace so you currently still need to use the test server and real credentials.
 
@@ -69,7 +69,7 @@ file.
 
 ## Sample Data
 
-`pipenv run submitter load-sample-data -i=YOUR_INPUT_QUEUE -o=YOUR_OUTPUT_QUEUE` will
+`uv run submitter load-sample-data -i=YOUR_INPUT_QUEUE -o=YOUR_OUTPUT_QUEUE` will
 load some sample data into the SQS input queue. If you want to load data for
 integration testing with DSpace test, add an additional option to the command:
 `-f tests/fixtures/integration-test-submission-messages.json`.
@@ -82,7 +82,7 @@ To verify that DSS can connect to the DSpace REST API, run `make verify-dspace-c
 
 ## Processing
 
-`pipenv run submitter start` will loop through all of the data in the SQS input queue, process the queue,
+`uv run submitter start` will loop through all of the data in the SQS input queue, process the queue,
 write to the output queue, delete the messages from the input queue, and then shutdown when no
 more messages are returned from the input queue
 

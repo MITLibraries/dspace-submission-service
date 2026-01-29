@@ -4,6 +4,7 @@
 This module includes custom Error classes that may be raised by the DSpace Submission
 Service.
 """
+
 import logging
 
 from requests.exceptions import RequestException
