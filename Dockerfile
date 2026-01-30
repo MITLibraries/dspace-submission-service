@@ -1,12 +1,20 @@
-FROM python:3.12-slim as build
-WORKDIR /app
-COPY . .
-
-RUN pip install --no-cache-dir --upgrade pip pipenv
+FROM python:3.12-slim AS build
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y git
 
-COPY Pipfile* /
-RUN pipenv install
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+ENV UV_SYSTEM_PYTHON=1
+ENV PYTHONPATH=/app
 
-ENTRYPOINT ["pipenv", "run", "submitter"]
+WORKDIR /app
+
+# Copy project metadata
+COPY pyproject.toml uv.lock* ./
+
+# Copy CLI source
+COPY submitter ./submitter
+
+# Install package into system python
+RUN uv pip install --system .
+
+ENTRYPOINT ["submitter"]

@@ -1,11 +1,63 @@
+[project]
+name = "submitter"
+version = "1.2.3"
+requires-python = "~=3.12.0"
+dependencies = [
+    "boto3",
+    "click",
+    "dspace-python-client",
+    "sentry-sdk",
+    "smart-open",
+]
+
+[project.scripts]
+submitter = "submitter.cli:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["submitter"]
+
 [tool.black]
 line-length = 90
+
+[dependency-groups]
+dev = [
+    "black",
+    "boto3-stubs[essential]",
+    "coverage",
+    "coveralls",
+    "freezegun",
+    "moto[s3, server, sqs]",
+    "mypy",
+    "pip-audit",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-env",
+    "requests-mock",
+    "ruff",
+    "safety",
+    "types-requests",
+]
 
 [tool.mypy]
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 exclude = ["tests/", "output/"]
 ignore_missing_imports = true
+
+[tool.uv]
+package = true
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+[tool.uv.sources]
+dspace-python-client = { git = "https://github.com/mitlibraries/dspace-python-client.git" }
 
 [tool.pytest.ini_options]
 log_level = "INFO"
@@ -69,7 +121,3 @@ max-doc-length = 90
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
-
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta:__legacy__"
