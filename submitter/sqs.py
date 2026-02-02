@@ -4,7 +4,6 @@ import logging
 from typing import TYPE_CHECKING
 
 import boto3
-from dspace.client import DSpaceClient
 
 from submitter import CONFIG, errors
 from submitter.submission import Submission
@@ -36,9 +35,6 @@ def message_loop(queue: str, wait: int, visibility: int = 30) -> None:
 
 
 def process(msgs: list["Message"]) -> None:
-    if CONFIG.SKIP_PROCESSING != "true":
-        client = DSpaceClient(CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT)
-        client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
 
     for message in msgs:
         message_id = message.message_id
@@ -51,7 +47,7 @@ def process(msgs: list["Message"]) -> None:
         else:
             submission = Submission.from_message(message)
             if not submission.result_message:
-                submission.submit(client)
+                submission.submit()
             response = write_message_to_queue(
                 submission.result_attributes,
                 submission.result_message,
