@@ -39,6 +39,14 @@ class Submission:
         self.result_message = result_message
         self.result_queue = result_queue
 
+        if CONFIG.SKIP_PROCESSING != "true":
+            self.client = DSpaceClient(
+                CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT
+            )
+            self.client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
+        else:
+            self.client = None
+
     @classmethod
     def from_message(cls, message: "Message") -> "Submission":
         """
@@ -159,7 +167,7 @@ class Submission:
                 }
             )
 
-    def submit(self, client: DSpaceClient) -> None:
+    def submit(self) -> None:
         """Submit a submission to DSpace as a new item with associated bitstreams.
 
         Creates a local item instance from the submission message, adds bitstream
@@ -178,12 +186,12 @@ class Submission:
         try:
             item = self.create_item()
             item = self.add_bitstreams_to_item(item)
-            post_item(client, item, self.collection_handle)
-            post_bitstreams(client, item)
+            self.post_item(item, self.collection_handle)
+            self.post_bitstreams(item)
             self.result_success_message(item)
         except requests.exceptions.Timeout as e:
             raise errors.DSpaceTimeoutError(
-                client.base_url, self.result_attributes
+                self.client.base_url, self.result_attributes
             ) from e
         except (
             errors.ItemCreateError,
@@ -193,66 +201,64 @@ class Submission:
             self.result_error_message(e.message, getattr(e, "dspace_error", None))
         except (errors.BitstreamOpenError, errors.BitstreamPostError) as e:
             self.result_error_message(e.message, getattr(e, "dspace_error", None))
-            clean_up_partial_success(client, item)
+            if item:
+                self.clean_up_partial_success(item)
         except Exception:
             logger.exception(
                 "Unexpected exception, aborting DSpace Submission Service processing"
             )
             raise
 
-
-def post_item(
-    client: DSpaceClient,
-    item: dspace.item.Item,
-    collection_handle: str | None,
-) -> None:
-    """Post item with metadata to DSpace."""
-    try:
-        entries = [entry.to_dict() for entry in item.metadata]
-        logger.debug(
-            "Posting item to DSpace with metadata: %s",
-            json.dumps(entries, indent=2),
-        )
-        item.post(client, collection_handle=collection_handle)
-        logger.debug("Posted item to Dspace with handle '%s'", item.handle)
-    except requests.exceptions.Timeout:
-        raise
-    except requests.exceptions.HTTPError as e:
-        raise errors.ItemPostError(e, collection_handle) from e
-
-
-def post_bitstreams(client: DSpaceClient, item: dspace.item.Item) -> None:
-    """Post all bitstreams to an existing DSpace item."""
-    logger.debug(
-        "Posting %d bitstream(s) to item '%s' in DSpace",
-        len(item.bitstreams),
-        item.handle,
-    )
-    for bitstream in item.bitstreams:
+    def post_item(
+        self,
+        item: dspace.item.Item,
+        collection_handle: str | None,
+    ) -> None:
+        """Post item with metadata to DSpace."""
         try:
-            bitstream.post(client, item_uuid=item.uuid)
+            entries = [entry.to_dict() for entry in item.metadata]
             logger.debug(
-                "Posted bitstream '%s' to item '%s', new bitstream uuid is '%s'",
-                bitstream.name,
-                item.handle,
-                bitstream.uuid,
+                "Posting item to DSpace with metadata: %s",
+                json.dumps(entries, indent=2),
             )
-        except FileNotFoundError as e:
-            raise errors.BitstreamOpenError(bitstream.file_path, item.handle) from e
+            item.post(self.client, collection_handle=collection_handle)
+            logger.debug("Posted item to Dspace with handle '%s'", item.handle)
+        except requests.exceptions.Timeout:
+            raise
         except requests.exceptions.HTTPError as e:
-            raise errors.BitstreamPostError(e, bitstream.name, item.handle) from e
+            raise errors.ItemPostError(e, collection_handle) from e
 
+    def post_bitstreams(self, item: dspace.item.Item) -> None:
+        """Post all bitstreams to an existing DSpace item."""
+        logger.debug(
+            "Posting %d bitstream(s) to item '%s' in DSpace",
+            len(item.bitstreams),
+            item.handle,
+        )
+        for bitstream in item.bitstreams:
+            try:
+                bitstream.post(self.client, item_uuid=item.uuid)
+                logger.debug(
+                    "Posted bitstream '%s' to item '%s', new bitstream uuid is '%s'",
+                    bitstream.name,
+                    item.handle,
+                    bitstream.uuid,
+                )
+            except FileNotFoundError as e:
+                raise errors.BitstreamOpenError(bitstream.file_path, item.handle) from e
+            except requests.exceptions.HTTPError as e:
+                raise errors.BitstreamPostError(e, bitstream.name, item.handle) from e
 
-def clean_up_partial_success(client: DSpaceClient, item: dspace.item.Item) -> None:
-    logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
-    handle = item.handle
-    for bitstream in item.bitstreams:
-        if bitstream.uuid is not None:
-            uuid = bitstream.uuid
-            bitstream.delete(client)
-            logger.info("Bitstream '%s' deleted from DSpace", uuid)
-    item.delete(client)
-    logger.info("Item '%s' deleted from DSpace", handle)
+    def clean_up_partial_success(self, item: dspace.item.Item) -> None:
+        logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
+        handle = item.handle
+        for bitstream in item.bitstreams:
+            if bitstream.uuid is not None:
+                uuid = bitstream.uuid
+                bitstream.delete(self.client)
+                logger.info("Bitstream '%s' deleted from DSpace", uuid)
+        item.delete(self.client)
+        logger.info("Item '%s' deleted from DSpace", handle)
 
 
 def prettify(traceback: list) -> list[str]:

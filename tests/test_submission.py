@@ -1,5 +1,6 @@
 import sys
 import traceback
+from unittest.mock import patch
 
 import pytest
 from dspace import Bitstream, Item
@@ -10,7 +11,7 @@ from submitter import errors
 from submitter.submission import Submission, prettify
 
 
-def test_submission_from_message_success(input_message_good):
+def test_submission_from_message_success(input_message_good, mocked_dspace):
     submission = Submission.from_message(input_message_good)
     assert submission.destination == "DSpace@MIT"
     assert submission.collection_handle == "0000/collection01"
@@ -31,7 +32,7 @@ def test_submission_from_message_success(input_message_good):
 
 
 def test_submission_from_message_creates_error_message(
-    input_message_nonconforming_body,
+    input_message_nonconforming_body, mocked_dspace
 ):
     submission = Submission.from_message(input_message_nonconforming_body)
     assert submission.result_message == (
@@ -41,7 +42,7 @@ def test_submission_from_message_creates_error_message(
 
 
 def test_submission_from_message_raises_invalid_queue_error(
-    input_message_invalid_queue,
+    input_message_invalid_queue, mocked_dspace
 ):
     with pytest.raises(errors.SubmitMessageInvalidResultQueueError):
         Submission.from_message(input_message_invalid_queue)
@@ -54,7 +55,7 @@ def test_submission_from_message_raises_missing_attribute_error(
         Submission.from_message(input_message_missing_attribute)
 
 
-def test_get_metadata_entries_from_file():
+def test_get_metadata_entries_from_file(mocked_dspace):
     submission = Submission(
         destination=None,
         collection_handle=None,
@@ -68,7 +69,7 @@ def test_get_metadata_entries_from_file():
 
 
 @freeze_time("2021-09-01 05:06:07")
-def test_result_error_message(input_message_good):
+def test_result_error_message(input_message_good, mocked_dspace):
     submission = Submission.from_message(input_message_good)
     submission.result_error_message("A test error")
     assert submission.result_message["ResultType"] == "error"
@@ -80,7 +81,7 @@ def test_result_error_message(input_message_good):
     )
 
 
-def test_result_success_message(input_message_good):
+def test_result_success_message(input_message_good, mocked_dspace):
     item = Item()
     item.handle = "0000/12345"
     item.lastModified = "yesterday"
@@ -106,17 +107,23 @@ def test_result_success_message(input_message_good):
     ]
 
 
-def test_submit_success(mocked_dspace, test_client, input_message_good):
+@patch("submitter.submission.DSpaceClient")
+def test_submit_success(
+    mock_dspace_client, test_client, mocked_dspace, input_message_good
+):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_good)
-    submission.submit(test_client)
+    submission.submit()
     assert submission.result_message["ResultType"] == "success"
 
 
+@patch("submitter.submission.DSpaceClient")
 def test_submit_item_create_error(
-    mocked_dspace, test_client, input_message_item_create_error
+    mock_dspace_client, test_client, mocked_dspace, input_message_item_create_error
 ):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_item_create_error)
-    submission.submit(test_client)
+    submission.submit()
     assert submission.result_message["ResultType"] == "error"
     assert (
         submission.result_message["ErrorInfo"]
@@ -125,11 +132,13 @@ def test_submit_item_create_error(
     )
 
 
+@patch("submitter.submission.DSpaceClient")
 def test_submit_add_bitstreams_error(
-    mocked_dspace, test_client, input_message_bitstream_create_error
+    mock_dspace_client, test_client, mocked_dspace, input_message_bitstream_create_error
 ):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_bitstream_create_error)
-    submission.submit(test_client)
+    submission.submit()
     assert submission.result_message["ResultType"] == "error"
     assert (
         submission.result_message["ErrorInfo"]
@@ -138,11 +147,13 @@ def test_submit_add_bitstreams_error(
     )
 
 
+@patch("submitter.submission.DSpaceClient")
 def test_submit_item_post_error(
-    mocked_dspace, test_client, input_message_item_post_error
+    mock_dspace_client, test_client, mocked_dspace, input_message_item_post_error
 ):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_item_post_error)
-    submission.submit(test_client)
+    submission.submit()
     assert submission.result_message["ResultType"] == "error"
     assert (
         submission.result_message["ErrorInfo"]
@@ -151,19 +162,26 @@ def test_submit_item_post_error(
     )
 
 
+@patch("submitter.submission.DSpaceClient")
 def test_submit_dspace_timeout_raises_error(
-    mocked_dspace, test_client, input_message_item_post_dspace_timeout
+    mock_dspace_client, test_client, mocked_dspace, input_message_item_post_dspace_timeout
 ):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_item_post_dspace_timeout)
     with pytest.raises(errors.DSpaceTimeoutError):
-        submission.submit(test_client)
+        submission.submit()
 
 
+@patch("submitter.submission.DSpaceClient")
 def test_submit_bitstream_post_file_open_error(
-    mocked_dspace, test_client, input_message_bitstream_file_open_error
+    mock_dspace_client,
+    test_client,
+    mocked_dspace,
+    input_message_bitstream_file_open_error,
 ):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_bitstream_file_open_error)
-    submission.submit(test_client)
+    submission.submit()
     assert submission.result_message["ResultType"] == "error"
     assert submission.result_message["ErrorInfo"] == (
         "Error occurred while opening file 'tests/fixtures/nothing-here' for "
@@ -172,11 +190,16 @@ def test_submit_bitstream_post_file_open_error(
     )
 
 
+@patch("submitter.submission.DSpaceClient")
 def test_submit_bitstream_post_dspace_error(
-    mocked_dspace, test_client, input_message_bitstream_dspace_post_error
+    mock_dspace_client,
+    test_client,
+    mocked_dspace,
+    input_message_bitstream_dspace_post_error,
 ):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_bitstream_dspace_post_error)
-    submission.submit(test_client)
+    submission.submit()
     assert submission.result_message["ResultType"] == "error"
     assert submission.result_message["ErrorInfo"] == (
         "Error occurred while posting bitstream 'test-file-01.pdf' to item in DSpace. "
@@ -184,15 +207,18 @@ def test_submit_bitstream_post_dspace_error(
     )
 
 
+@patch("submitter.submission.DSpaceClient")
 def test_submit_dspace_unknown_api_error_logs_exception_and_raises_error(
+    mock_dspace_client,
+    test_client,
     caplog,
     mocked_dspace,
-    test_client,
     input_message_item_post_dspace_generic_500_error,
 ):
+    mock_dspace_client.return_value = test_client
     submission = Submission.from_message(input_message_item_post_dspace_generic_500_error)
     with pytest.raises(RequestException):
-        submission.submit(test_client)
+        submission.submit()
     # assert actual encountered exception is logged (for debugging purposes)
     assert (
         "Catastrophic error before or during request!  No response to parse."
