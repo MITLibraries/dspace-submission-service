@@ -23,6 +23,9 @@ class Config:
         self.DSPACE_USER = os.getenv("DSPACE_USER")
         self.DSPACE_PASSWORD = os.getenv("DSPACE_PASSWORD")
         self.DSPACE_TIMEOUT = float(os.getenv("DSPACE_TIMEOUT", "120.0"))
+        self.LOCAL_DSPACE_API_URL = os.getenv("LOCAL_DSPACE_API_URL")
+        self.LOCAL_DSPACE_USER = os.getenv("LOCAL_DSPACE_USER")
+        self.LOCAL_DSPACE_PASSWORD = os.getenv("LOCAL_DSPACE_PASSWORD")
         self.INPUT_QUEUE = os.getenv("INPUT_QUEUE")
         self.LOG_FILTER = os.getenv("LOG_FILTER", "true").lower()
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -44,3 +47,19 @@ class Config:
             self.SKIP_PROCESSING = "false"
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
             self.OUTPUT_QUEUES = ["empty_result_queue"]
+
+    def dspace_instances(self) -> dict[str, dict[str, str | float | None]]:
+        return {
+            "DSpace@MIT": {
+                "url": self.DSPACE_API_URL,
+                "user": self.DSPACE_USER,
+                "password": self.DSPACE_PASSWORD,
+                "timeout": self.DSPACE_TIMEOUT,
+            },
+            "DSpace8Local": {
+                "url": self.LOCAL_DSPACE_API_URL,
+                "user": self.LOCAL_DSPACE_USER,
+                "password": self.LOCAL_DSPACE_PASSWORD,
+                "timeout": self.DSPACE_TIMEOUT,
+            },
+        }

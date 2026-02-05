@@ -38,14 +38,34 @@ class Submission:
         self.result_attributes = attributes
         self.result_message = result_message
         self.result_queue = result_queue
+        self._dspace_clients: dict[str, DSpaceClient] = {}
 
-        if CONFIG.SKIP_PROCESSING != "true":
-            self.client = DSpaceClient(
-                CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT
-            )
-            self.client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
-        else:
-            self.client = None
+    def get_dspace_client(self) -> DSpaceClient:
+        """Create or get a cached DSpace client for the submission destination."""
+        if not self.destination:
+            raise errors.InvalidDSpaceDestinationError(self.destination)
+        logger.debug(f"Getting DSpace client for destination '{self.destination}'")
+        if self.destination not in self._dspace_clients:
+            client = self._create_dspace_client()
+            self._dspace_clients[self.destination] = client
+        return self._dspace_clients[self.destination]
+
+    def _create_dspace_client(self) -> DSpaceClient:
+        """Create a DSpace client for the submission destination."""
+        config = CONFIG.dspace_instances().get(
+            self.destination if self.destination else ""
+        )
+        if not config:
+            raise errors.InvalidDSpaceDestinationError(self.destination)
+        if self.destination == "DSpace@MIT":
+            logger.debug("Using DSpace@MIT instance for submission")
+            client = DSpaceClient(config["url"], timeout=config["timeout"])
+            client.login(config["user"], config["password"])
+        elif self.destination in ["DSpace8Local"]:
+            logger.debug("Using local DSpace instance for submission")
+            # Not yet implemented
+            client = None
+        return client
 
     @classmethod
     def from_message(cls, message: "Message") -> "Submission":
@@ -183,6 +203,8 @@ class Submission:
                 it is re-raised with some useful message information and stops the
                 entire SQS message loop process until someone can investigate further.
         """
+        if CONFIG.SKIP_PROCESSING != "true":
+            self.client = self.get_dspace_client()
         try:
             item = self.create_item()
             item = self.add_bitstreams_to_item(item)
@@ -190,9 +212,8 @@ class Submission:
             self.post_bitstreams(item)
             self.result_success_message(item)
         except requests.exceptions.Timeout as e:
-            raise errors.DSpaceTimeoutError(
-                self.client.base_url, self.result_attributes
-            ) from e
+            dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
+            raise errors.DSpaceTimeoutError(dspace_url, self.result_attributes) from e
         except (
             errors.ItemCreateError,
             errors.BitstreamAddError,

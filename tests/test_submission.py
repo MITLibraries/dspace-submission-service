@@ -4,11 +4,42 @@ from unittest.mock import patch
 
 import pytest
 from dspace import Bitstream, Item
+from dspace.client import DSpaceClient
 from freezegun import freeze_time
 from requests.exceptions import RequestException
 
 from submitter import errors
 from submitter.submission import Submission, prettify
+
+
+def test_submission_get_dspace_client_success(mocked_dspace):
+    submission = Submission(
+        destination="DSpace@MIT",
+        attributes=None,
+        result_queue=None,
+    )
+    dspace_client = submission.get_dspace_client()
+    assert isinstance(dspace_client, DSpaceClient)
+
+
+def test_submission_get_dspace_client_invalid_destination_raises_error():
+    submission = Submission(
+        destination="InvalidDestination",
+        attributes=None,
+        result_queue=None,
+    )
+    with pytest.raises(errors.InvalidDSpaceDestinationError):
+        submission.get_dspace_client()
+
+
+def test_submission_get_dspace_client_no_destination_raises_error():
+    submission = Submission(
+        destination=None,
+        attributes=None,
+        result_queue=None,
+    )
+    with pytest.raises(errors.InvalidDSpaceDestinationError):
+        submission.get_dspace_client()
 
 
 def test_submission_from_message_success(input_message_good, mocked_dspace):
@@ -57,7 +88,7 @@ def test_submission_from_message_raises_missing_attribute_error(
 
 def test_get_metadata_entries_from_file(mocked_dspace):
     submission = Submission(
-        destination=None,
+        destination="DSpace@MIT",
         collection_handle=None,
         metadata_location="tests/fixtures/test-item-metadata.json",
         files=None,
