@@ -46,22 +46,21 @@ class Submission:
             raise errors.InvalidDSpaceDestinationError(self.destination)
         logger.debug(f"Getting DSpace client for destination '{self.destination}'")
         if self.destination not in self._dspace_clients:
-            client = self._create_dspace_client()
+            client = self._create_dspace_client(self.destination)
             self._dspace_clients[self.destination] = client
         return self._dspace_clients[self.destination]
 
-    def _create_dspace_client(self) -> DSpaceClient:
+    def _create_dspace_client(self, destination: str) -> DSpaceClient:
         """Create a DSpace client for the submission destination."""
-        config = CONFIG.dspace_instances().get(
-            self.destination if self.destination else ""
-        )
-        if not config:
-            raise errors.InvalidDSpaceDestinationError(self.destination)
-        if self.destination == "DSpace@MIT":
+        try:
+            credentials = CONFIG.dspace_credentials[destination]
+        except KeyError as exc:
+            raise errors.InvalidDSpaceDestinationError(destination) from exc
+        if destination == "DSpace@MIT":
             logger.debug("Using DSpace@MIT instance for submission")
-            client = DSpaceClient(config["url"], timeout=config["timeout"])
-            client.login(config["user"], config["password"])
-        elif self.destination in ["DSpace8Local"]:
+            client = DSpaceClient(credentials["url"], timeout=credentials["timeout"])
+            client.login(credentials["user"], credentials["password"])
+        elif destination in ["DSpace8Local"]:
             logger.debug("Using local DSpace instance for submission")
             # Not yet implemented
             client = None

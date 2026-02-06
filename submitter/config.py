@@ -48,7 +48,9 @@ class Config:
             self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
             self.OUTPUT_QUEUES = ["empty_result_queue"]
 
-    def dspace_instances(self) -> dict[str, dict[str, str | float | None]]:
+    @property
+    def dspace_credentials(self) -> dict[str, dict[str, str | float | None]]:
+        """Return DSpace credentials for supportedinstances."""
         return {
             "DSpace@MIT": {
                 "url": self.DSPACE_API_URL,
