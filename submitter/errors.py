@@ -14,6 +14,19 @@ from submitter import CONFIG
 logger = logging.getLogger(__name__)
 
 
+class InvalidDSpaceDestinationError(Exception):
+    """Exception raised when an invalid DSpace destination is specified.
+
+    Args:
+        destination: The invalid destination name
+    Attributes:
+        message (str): Explanation of the error
+    """
+
+    def __init__(self, destination: str | None):
+        self.message = f"Invalid DSpace destination specified: '{destination}'."
+
+
 class ItemCreateError(Exception):
     """Exception raised when creating an item instance from a submission message.
 
