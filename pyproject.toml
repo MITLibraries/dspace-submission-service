@@ -6,6 +6,7 @@ dependencies = [
     "boto3",
     "click",
     "dspace-python-client",
+    "dspace-rest-client>=0.1.16",
     "sentry-sdk",
     "smart-open",
 ]
@@ -51,6 +52,7 @@ ignore_missing_imports = true
 
 [tool.uv]
 package = true
+override-dependencies = ["smart_open>=7.0.0"]
 
 [[tool.uv.index]]
 name = "pypi"

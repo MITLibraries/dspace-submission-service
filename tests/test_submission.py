@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from dspace import Bitstream, Item
 from dspace.client import DSpaceClient as DSpace6Client
+from dspace_rest_client.client import DSpaceClient as DSpace8Client
 from freezegun import freeze_time
 from requests.exceptions import RequestException
 
@@ -20,6 +21,28 @@ def test_submission_get_dspace_client_dspace6_success(mocked_dspace6):
     )
     dspace_client = submission.get_dspace_client()
     assert isinstance(dspace_client, DSpace6Client)
+
+
+def test_submission_get_dspace_client_dspace8_success(mocked_dspace8):
+    submission = Submission(
+        destination="DSpace8Local",
+        attributes=None,
+        result_queue=None,
+    )
+    dspace_client = submission.get_dspace_client()
+    assert isinstance(dspace_client, DSpace8Client)
+
+
+def test_submission_get_dspace_client_dspace8_no_auth_raises_error(
+    mocked_dspace8_auth_failure,
+):
+    submission = Submission(
+        destination="DSpace8Local",
+        attributes=None,
+        result_queue=None,
+    )
+    with pytest.raises(errors.DSpaceAuthenticationError):
+        submission.get_dspace_client()
 
 
 def test_submission_get_dspace_client_invalid_destination_raises_error():
@@ -148,6 +171,11 @@ def test_submit_dspace6_success(
     assert submission.result_message["ResultType"] == "success"
 
 
+def test_submit_dspace8_success(dspace8_submission_instance):
+    dspace8_submission_instance.submit()
+    assert dspace8_submission_instance.result_message["ResultType"] == "success"
+
+
 @patch("submitter.submission.DSpace6Client")
 def test_submit_dspace6_item_create_error(
     mock_dspace_client,
@@ -269,3 +297,9 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
         "Unexpected exception, aborting DSpace Submission Service processing"
         in caplog.text
     )
+
+
+def test_create_item_dspace8_success(dspace8_submission_instance):
+    item = dspace8_submission_instance.create_item_dspace8()
+    assert item.uuid == "item01"
+    assert item.bitstreams[0].uuid == "bitstream01"
