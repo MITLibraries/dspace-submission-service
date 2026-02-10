@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from dspace import Bitstream, Item
-from dspace.client import DSpaceClient
+from dspace.client import DSpaceClient as DSpace6Client
 from freezegun import freeze_time
 from requests.exceptions import RequestException
 
@@ -12,14 +12,14 @@ from submitter import errors
 from submitter.submission import Submission, prettify
 
 
-def test_submission_get_dspace_client_success(mocked_dspace):
+def test_submission_get_dspace_client_dspace6_success(mocked_dspace6):
     submission = Submission(
         destination="DSpace@MIT",
         attributes=None,
         result_queue=None,
     )
     dspace_client = submission.get_dspace_client()
-    assert isinstance(dspace_client, DSpaceClient)
+    assert isinstance(dspace_client, DSpace6Client)
 
 
 def test_submission_get_dspace_client_invalid_destination_raises_error():
@@ -42,7 +42,7 @@ def test_submission_get_dspace_client_no_destination_raises_error():
         submission.get_dspace_client()
 
 
-def test_submission_from_message_success(input_message_good, mocked_dspace):
+def test_submission_from_message_dspace6_success(input_message_good, mocked_dspace6):
     submission = Submission.from_message(input_message_good)
     assert submission.destination == "DSpace@MIT"
     assert submission.collection_handle == "0000/collection01"
@@ -62,8 +62,8 @@ def test_submission_from_message_success(input_message_good, mocked_dspace):
     assert submission.result_queue == "empty_result_queue"
 
 
-def test_submission_from_message_creates_error_message(
-    input_message_nonconforming_body, mocked_dspace
+def test_submission_from_message_dspace6_creates_error_message(
+    input_message_nonconforming_body, mocked_dspace6
 ):
     submission = Submission.from_message(input_message_nonconforming_body)
     assert submission.result_message == (
@@ -72,8 +72,8 @@ def test_submission_from_message_creates_error_message(
     )
 
 
-def test_submission_from_message_raises_invalid_queue_error(
-    input_message_invalid_queue, mocked_dspace
+def test_submission_from_message_dspace6_raises_invalid_queue_error(
+    input_message_invalid_queue, mocked_dspace6
 ):
     with pytest.raises(errors.SubmitMessageInvalidResultQueueError):
         Submission.from_message(input_message_invalid_queue)
@@ -86,7 +86,7 @@ def test_submission_from_message_raises_missing_attribute_error(
         Submission.from_message(input_message_missing_attribute)
 
 
-def test_get_metadata_entries_from_file(mocked_dspace):
+def test_get_metadata_entries_from_file_dspace6(mocked_dspace6):
     submission = Submission(
         destination="DSpace@MIT",
         collection_handle=None,
@@ -95,12 +95,12 @@ def test_get_metadata_entries_from_file(mocked_dspace):
         attributes=None,
         result_queue=None,
     )
-    metadata = submission.get_metadata_entries_from_file()
+    metadata = submission.get_metadata_entries_from_file_dspace6()
     assert next(metadata) == {"key": "dc.title", "value": "Test Thesis"}
 
 
 @freeze_time("2021-09-01 05:06:07")
-def test_result_error_message(input_message_good, mocked_dspace):
+def test_result_error_message_dspace6(input_message_good, mocked_dspace6):
     submission = Submission.from_message(input_message_good)
     submission.result_error_message("A test error")
     assert submission.result_message["ResultType"] == "error"
@@ -112,7 +112,7 @@ def test_result_error_message(input_message_good, mocked_dspace):
     )
 
 
-def test_result_success_message(input_message_good, mocked_dspace):
+def test_result_success_message_dspace6(input_message_good, mocked_dspace6):
     item = Item()
     item.handle = "0000/12345"
     item.lastModified = "yesterday"
@@ -138,21 +138,24 @@ def test_result_success_message(input_message_good, mocked_dspace):
     ]
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_success(
-    mock_dspace_client, test_client, mocked_dspace, input_message_good
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_success(
+    mock_dspace_client, test_dspace6_client, mocked_dspace6, input_message_good
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_good)
     submission.submit()
     assert submission.result_message["ResultType"] == "success"
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_item_create_error(
-    mock_dspace_client, test_client, mocked_dspace, input_message_item_create_error
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_item_create_error(
+    mock_dspace_client,
+    test_dspace6_client,
+    mocked_dspace6,
+    input_message_item_create_error,
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_item_create_error)
     submission.submit()
     assert submission.result_message["ResultType"] == "error"
@@ -163,11 +166,14 @@ def test_submit_item_create_error(
     )
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_add_bitstreams_error(
-    mock_dspace_client, test_client, mocked_dspace, input_message_bitstream_create_error
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_add_bitstreams_error(
+    mock_dspace_client,
+    test_dspace6_client,
+    mocked_dspace6,
+    input_message_bitstream_create_error,
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_bitstream_create_error)
     submission.submit()
     assert submission.result_message["ResultType"] == "error"
@@ -178,11 +184,11 @@ def test_submit_add_bitstreams_error(
     )
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_item_post_error(
-    mock_dspace_client, test_client, mocked_dspace, input_message_item_post_error
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_item_post_error(
+    mock_dspace_client, test_dspace6_client, mocked_dspace6, input_message_item_post_error
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_item_post_error)
     submission.submit()
     assert submission.result_message["ResultType"] == "error"
@@ -193,24 +199,27 @@ def test_submit_item_post_error(
     )
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_dspace_timeout_raises_error(
-    mock_dspace_client, test_client, mocked_dspace, input_message_item_post_dspace_timeout
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_timeout_raises_error(
+    mock_dspace_client,
+    test_dspace6_client,
+    mocked_dspace6,
+    input_message_item_post_dspace_timeout,
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_item_post_dspace_timeout)
     with pytest.raises(errors.DSpaceTimeoutError):
         submission.submit()
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_bitstream_post_file_open_error(
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_bitstream_post_file_open_error(
     mock_dspace_client,
-    test_client,
-    mocked_dspace,
+    test_dspace6_client,
+    mocked_dspace6,
     input_message_bitstream_file_open_error,
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_bitstream_file_open_error)
     submission.submit()
     assert submission.result_message["ResultType"] == "error"
@@ -221,14 +230,14 @@ def test_submit_bitstream_post_file_open_error(
     )
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_bitstream_post_dspace_error(
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_bitstream_post_dspace_error(
     mock_dspace_client,
-    test_client,
-    mocked_dspace,
+    test_dspace6_client,
+    mocked_dspace6,
     input_message_bitstream_dspace_post_error,
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_bitstream_dspace_post_error)
     submission.submit()
     assert submission.result_message["ResultType"] == "error"
@@ -238,15 +247,15 @@ def test_submit_bitstream_post_dspace_error(
     )
 
 
-@patch("submitter.submission.DSpaceClient")
-def test_submit_dspace_unknown_api_error_logs_exception_and_raises_error(
+@patch("submitter.submission.DSpace6Client")
+def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error(
     mock_dspace_client,
-    test_client,
+    test_dspace6_client,
     caplog,
-    mocked_dspace,
+    mocked_dspace6,
     input_message_item_post_dspace_generic_500_error,
 ):
-    mock_dspace_client.return_value = test_client
+    mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_item_post_dspace_generic_500_error)
     with pytest.raises(RequestException):
         submission.submit()

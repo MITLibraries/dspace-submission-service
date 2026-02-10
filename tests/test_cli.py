@@ -49,7 +49,7 @@ def test_cli_load_sample_output_data(mocked_sqs):
     assert len(sqs_messages) > 0
 
 
-def test_cli_start(mocked_dspace, mocked_sqs):
+def test_cli_start(mocked_dspace6, mocked_sqs):
     input_queue = mocked_sqs.get_queue_by_name(QueueName="input_queue_with_messages")
     result_queue = mocked_sqs.get_queue_by_name(QueueName="empty_result_queue")
 
@@ -75,7 +75,7 @@ def test_cli_start(mocked_dspace, mocked_sqs):
     assert len(out_messages) > 0
 
 
-def test_verify_dspace_connection_success(mocked_dspace, caplog):
+def test_verify_dspace_connection_success(mocked_dspace6, caplog):
     with caplog.at_level(logging.INFO):
         runner = CliRunner()
         result = runner.invoke(
@@ -90,7 +90,7 @@ def test_verify_dspace_connection_success(mocked_dspace, caplog):
         )
 
 
-def test_verify_dspace_connection_failed(mocked_dspace_auth_failure, caplog):
+def test_verify_dspace_connection_failed(mocked_dspace6_auth_failure, caplog):
     runner = CliRunner()
     result = runner.invoke(
         main,

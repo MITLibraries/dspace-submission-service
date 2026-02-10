@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import dspace
 import requests
 import smart_open
-from dspace.client import DSpaceClient
+from dspace.client import DSpaceClient as DSpace6Client
 
 from submitter import CONFIG, errors
 
@@ -38,9 +38,9 @@ class Submission:
         self.result_attributes = attributes
         self.result_message = result_message
         self.result_queue = result_queue
-        self._dspace_clients: dict[str, DSpaceClient] = {}
+        self._dspace_clients: dict[str, DSpace6Client] = {}
 
-    def get_dspace_client(self) -> DSpaceClient:
+    def get_dspace_client(self) -> DSpace6Client:
         """Create or get a cached DSpace client for the submission destination."""
         if not self.destination:
             raise errors.InvalidDSpaceDestinationError(self.destination)
@@ -50,7 +50,7 @@ class Submission:
             self._dspace_clients[self.destination] = client
         return self._dspace_clients[self.destination]
 
-    def _create_dspace_client(self, destination: str) -> DSpaceClient:
+    def _create_dspace_client(self, destination: str) -> DSpace6Client:
         """Create a DSpace client for the submission destination."""
         try:
             credentials = CONFIG.dspace_credentials[destination]
@@ -58,9 +58,9 @@ class Submission:
             raise errors.InvalidDSpaceDestinationError(destination) from exc
         if destination == "DSpace@MIT":
             logger.debug("Using DSpace@MIT instance for submission")
-            client = DSpaceClient(credentials["url"], timeout=credentials["timeout"])
+            client = DSpace6Client(credentials["url"], timeout=credentials["timeout"])
             client.login(credentials["user"], credentials["password"])
-        elif destination in ["DSpace8Local"]:
+        elif destination in ["DSpace8Local", "DSpace8MIT"]:
             logger.debug("Using local DSpace instance for submission")
             # Not yet implemented
             client = None
@@ -122,24 +122,24 @@ class Submission:
             files=files,
         )
 
-    def create_item(self) -> dspace.item.Item:
+    def create_item_dspace6(self) -> dspace.item.Item:
         """Create item instance with metadata entries from submission message."""
         logger.debug("Creating local item instance from submission message")
         item = dspace.item.Item()
         try:
-            for entry in self.get_metadata_entries_from_file():
+            for entry in self.get_metadata_entries_from_file_dspace6():
                 metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
                 item.metadata.append(metadata_entry)
         except KeyError as e:
             raise errors.ItemCreateError(self.metadata_location) from e
         return item
 
-    def get_metadata_entries_from_file(self) -> Iterator[dict]:
+    def get_metadata_entries_from_file_dspace6(self) -> Iterator[dict]:
         with smart_open.open(self.metadata_location) as f:
             metadata = json.load(f)
         yield from metadata["metadata"]
 
-    def add_bitstreams_to_item(self, item: dspace.item.Item) -> dspace.item.Item:
+    def add_bitstreams_to_item_dspace6(self, item: dspace.item.Item) -> dspace.item.Item:
         """Add bitstreams to item from files in submission message."""
         logger.debug("Adding bitstreams to local item instance from submission message")
         try:
@@ -205,10 +205,10 @@ class Submission:
         if CONFIG.SKIP_PROCESSING != "true":
             self.client = self.get_dspace_client()
         try:
-            item = self.create_item()
-            item = self.add_bitstreams_to_item(item)
-            self.post_item(item, self.collection_handle)
-            self.post_bitstreams(item)
+            item = self.create_item_dspace6()
+            item = self.add_bitstreams_to_item_dspace6(item)
+            self.post_item_dspace6(item, self.collection_handle)
+            self.post_bitstreams_dspace6(item)
             self.result_success_message(item)
         except requests.exceptions.Timeout as e:
             dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
@@ -229,7 +229,7 @@ class Submission:
             )
             raise
 
-    def post_item(
+    def post_item_dspace6(
         self,
         item: dspace.item.Item,
         collection_handle: str | None,
@@ -248,7 +248,7 @@ class Submission:
         except requests.exceptions.HTTPError as e:
             raise errors.ItemPostError(e, collection_handle) from e
 
-    def post_bitstreams(self, item: dspace.item.Item) -> None:
+    def post_bitstreams_dspace6(self, item: dspace.item.Item) -> None:
         """Post all bitstreams to an existing DSpace item."""
         logger.debug(
             "Posting %d bitstream(s) to item '%s' in DSpace",

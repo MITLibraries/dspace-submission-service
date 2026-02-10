@@ -6,7 +6,7 @@ import os
 import boto3
 import pytest
 import requests_mock
-from dspace import DSpaceClient
+from dspace import DSpaceClient as DSpace6Client
 from moto import mock_aws
 from requests import exceptions
 
@@ -53,7 +53,7 @@ def test_aws_user(aws_credentials):
 
 
 @pytest.fixture
-def mocked_dspace():
+def mocked_dspace6():
     """The following mock responses from DSpace based on the URL of the request.
 
     Fixtures below that prepare an SQS message, where specific collections or bitstreams
@@ -113,7 +113,7 @@ def mocked_dspace():
 
 
 @pytest.fixture
-def mocked_dspace_auth_failure():
+def mocked_dspace6_auth_failure():
     with requests_mock.Mocker() as m:
         m.post("mock://dspace.edu/rest/login", status_code=401)
         yield m
@@ -164,8 +164,8 @@ def mocked_s3(aws_credentials):
 
 
 @pytest.fixture
-def test_client(mocked_dspace):
-    client = DSpaceClient("mock://dspace.edu/rest/")
+def test_dspace6_client(mocked_dspace6):
+    client = DSpace6Client("mock://dspace.edu/rest/")
     client.login("test", "test")
     return client
 

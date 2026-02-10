@@ -1,7 +1,7 @@
 import logging
 
 import click
-from dspace.client import DSpaceClient
+from dspace.client import DSpaceClient as DSpace6Client
 from requests.exceptions import HTTPError
 
 from submitter import CONFIG
@@ -93,7 +93,7 @@ def create_queue(name: str) -> None:
 
 @main.command()
 def verify_dspace_connection() -> None:
-    client = DSpaceClient(CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT)
+    client = DSpace6Client(CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT)
     try:
         client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
     except HTTPError:
