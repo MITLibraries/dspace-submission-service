@@ -99,3 +99,16 @@ docker run submitter:latest --
 The `Makefile` contains commands for running the application in the `dev`, `stage`, and `prod` environments as an ECS task. 
 
 The commands are produced by the Terraform used to create the infrastructure and copy/pasted here for convenience. Calling each command will execute the latest version of the container in the specified environment.
+
+## Related Assets
+
+This is a repository that provides the DSpace Submission Service. The following application infrastructure repositories are related to this repository:
+
+* [DSS Infrastructure](https://github.com/MITLibraries/mitlib-tf-workloads-dss)
+* [ECR](https://github.com/MITLibraries/mitlib-tf-workloads-ecr)
+
+## Maintainers
+
+* Owner: See [CODEOWNERS](./.github/CODEOWNERS)
+* Team: See [CODEOWNERS](./.github/CODEOWNERS)
+* Last Maintenance: 2026-02
