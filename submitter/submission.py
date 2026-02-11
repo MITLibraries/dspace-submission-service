@@ -10,8 +10,12 @@ from typing import TYPE_CHECKING
 import dspace
 import requests
 import smart_open
-from dspace.client import DSpaceClient as DSpace6Client
-from dspace_rest_client.client import DSpaceClient as DSpace8Client
+from dspace.client import (
+    DSpaceClient as DSpace6Client,
+)  # Update after DSpace 8 migration
+from dspace_rest_client.client import (
+    DSpaceClient as DSpace8Client,
+)  # Update after DSpace 8 migration
 from dspace_rest_client.models import Item as DSpace8Item
 
 from submitter import CONFIG, errors
@@ -41,9 +45,13 @@ class Submission:
         self.result_attributes = attributes
         self.result_message = result_message
         self.result_queue = result_queue
-        self._dspace_clients: dict[str, DSpace6Client] = {}
+        self._dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
+            {}
+        )  # Update after DSpace 8 migration
 
-    def get_dspace_client(self) -> DSpace6Client:
+    def get_dspace_client(
+        self,
+    ) -> DSpace6Client | DSpace8Client:  # Update after DSpace 8 migration
         """Create or get a cached DSpace client for the submission destination."""
         if not self.destination:
             raise errors.InvalidDSpaceDestinationError(self.destination)
@@ -53,22 +61,30 @@ class Submission:
             self._dspace_clients[self.destination] = client
         return self._dspace_clients[self.destination]
 
-    def _create_dspace_client(self, destination: str) -> DSpace6Client:
+    def _create_dspace_client(
+        self, destination: str
+    ) -> DSpace6Client | DSpace8Client:  # Update after DSpace 8 migration
         """Create a DSpace client for the submission destination."""
+        logger.debug(f"Using {destination} instance for submission")
         try:
             credentials = CONFIG.dspace_credentials[destination]
         except KeyError as exc:
             raise errors.InvalidDSpaceDestinationError(destination) from exc
-        if destination == "DSpace@MIT":
-            logger.debug("Using DSpace@MIT instance for submission")
-            client = DSpace6Client(credentials["url"], timeout=credentials["timeout"])
-            client.login(credentials["user"], credentials["password"])
-        elif destination in ["DSpace8Local", "DSpace8MIT"]:
-            logger.debug("Using DSpace 8 instance for submission")
-            client = self._create_authenticated_dspace8_client(credentials)
+        if destination == "DSpace@MIT":  # Update after DSpace 8 migration
+            return self._create_dspace6_client(credentials)
+        elif destination in ["DSpace8Local", "DSpace8MIT"]:  # noqa: RET505
+            return self._create_dspace8_client(credentials)
+        raise ValueError(f"Destination value not recognized: {destination}")
+
+    def _create_dspace6_client(
+        self, credentials: dict[str, str | float | None]
+    ) -> DSpace6Client:
+        """Create and authenticate a DSpace 6 client."""
+        client = DSpace6Client(credentials["url"], timeout=credentials["timeout"])
+        client.login(credentials["user"], credentials["password"])
         return client
 
-    def _create_authenticated_dspace8_client(
+    def _create_dspace8_client(
         self, credentials: dict[str, str | float | None]
     ) -> DSpace8Client:
         """Create and authenticate a DSpace 8 client."""
@@ -141,7 +157,9 @@ class Submission:
             files=files,
         )
 
-    def create_item_dspace6(self) -> dspace.item.Item:
+    def _create_item_dspace6(  # Update after DSpace 8 migration
+        self,
+    ) -> dspace.item.Item:
         """Create item instance with metadata entries from submission message."""
         logger.debug("Creating local item instance from submission message")
         item = dspace.item.Item()
@@ -153,7 +171,7 @@ class Submission:
             raise errors.ItemCreateError(self.metadata_location) from e
         return item
 
-    def create_item_dspace8(self) -> DSpace8Item:
+    def _create_item_dspace8(self) -> DSpace8Item:
         """Create item instance with metadata entries from submission message."""
         collection = self.client.resolve_identifier_to_dso(
             identifier=self.collection_handle
@@ -191,12 +209,16 @@ class Submission:
             logger.info(f"Bitstream created with UUID: {new_bitstream.uuid}")
         item.bitstreams.append(new_bitstream)
 
-    def get_metadata_entries_from_file_dspace6(self) -> Iterator[dict]:
+    def get_metadata_entries_from_file_dspace6(  # Update after DSpace 8 migration
+        self,
+    ) -> Iterator[dict]:
         with smart_open.open(self.metadata_location) as f:
             metadata = json.load(f)
         yield from metadata["metadata"]
 
-    def add_bitstreams_to_item_dspace6(self, item: dspace.item.Item) -> dspace.item.Item:
+    def add_bitstreams_to_item_dspace6(  # Update after DSpace 8 migration
+        self, item: dspace.item.Item
+    ) -> dspace.item.Item:
         """Add bitstreams to item from files in submission message."""
         logger.debug("Adding bitstreams to local item instance from submission message")
         try:
@@ -262,20 +284,18 @@ class Submission:
         if CONFIG.SKIP_PROCESSING != "true":
             self.client = self.get_dspace_client()
         try:
-            if self.destination == "DSpace@MIT":
-                # DSpace 6 instances, to be removed after migration to DSpace 8
-                item = self.create_item_dspace6()
+            if self.destination == "DSpace@MIT":  # Update after DSpace 8 migration
+                item = self._create_item_dspace6()
                 item = self.add_bitstreams_to_item_dspace6(item)
                 self.post_item_dspace6(item, self.collection_handle)
                 self.post_bitstreams_dspace6(item)
             elif self.destination in ["DSpace8Local", "DSpace8MIT"]:
-                # DSpace 8 instances
-                item = self.create_item_dspace8()
+                item = self._create_item_dspace8()
             self.result_success_message(item)
         except requests.exceptions.Timeout as e:
             dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
             raise errors.DSpaceTimeoutError(dspace_url, self.result_attributes) from e
-        except (
+        except (  # Update after DSpace 8 migration
             errors.ItemCreateError,
             errors.BitstreamAddError,
             errors.ItemPostError,
@@ -291,7 +311,7 @@ class Submission:
             )
             raise
 
-    def post_item_dspace6(
+    def post_item_dspace6(  # Update after DSpace 8 migration
         self,
         item: dspace.item.Item,
         collection_handle: str | None,
@@ -310,7 +330,9 @@ class Submission:
         except requests.exceptions.HTTPError as e:
             raise errors.ItemPostError(e, collection_handle) from e
 
-    def post_bitstreams_dspace6(self, item: dspace.item.Item) -> None:
+    def post_bitstreams_dspace6(  # Update after DSpace 8 migration
+        self, item: dspace.item.Item
+    ) -> None:
         """Post all bitstreams to an existing DSpace item."""
         logger.debug(
             "Posting %d bitstream(s) to item '%s' in DSpace",

@@ -300,6 +300,6 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
 
 
 def test_create_item_dspace8_success(dspace8_submission_instance):
-    item = dspace8_submission_instance.create_item_dspace8()
+    item = dspace8_submission_instance._create_item_dspace8()  # noqa: SLF001
     assert item.uuid == "item01"
     assert item.bitstreams[0].uuid == "bitstream01"
