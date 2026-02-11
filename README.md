@@ -104,7 +104,7 @@ The commands are produced by the Terraform used to create the infrastructure and
 
 This is a repository that provides the DSpace Submission Service. The following application infrastructure repositories are related to this repository:
 
-* [DSS Infrastructure](https://github.com/MITLibraries/mitlib-tf-workloads-dss)
+* [DSO Infrastructure](https://github.com/MITLibraries/mitlib-tf-workloads-dso)
 * [ECR](https://github.com/MITLibraries/mitlib-tf-workloads-ecr)
 
 ## Maintainers
