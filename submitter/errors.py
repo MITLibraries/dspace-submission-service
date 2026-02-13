@@ -156,6 +156,31 @@ class DSpaceTimeoutError(Exception):
         )
 
 
+class DSpaceAuthenticationError(Exception):
+    """Exception raised due to a failure to authenticate to the DSpace server.
+
+    Args:
+        source_error: Originating Exception
+        dspace_url: The URL of the DSpace server to which authentication was attempted
+
+    Attributes:
+        source_error(Exception): Originating exception
+        message(str): Explanation of the error
+    """
+
+    def __init__(
+        self,
+        dspace_url: str | float | None,
+        dspace_user: str | float | None,
+    ):
+        self.message = (
+            f"Failed to authenticate to DSpace server at '{dspace_url}' with user "
+            f"'{dspace_user}'. Please verify that the DSPACE_USER and DSPACE_PASSWORD "
+            "environment variables are set correctly and that the DSpace server is "
+            "accessible."
+        )
+
+
 class SQSMessageSendError(Exception):
     """Exception raised when a message sent to an SQS result queue cannot be verified.
 

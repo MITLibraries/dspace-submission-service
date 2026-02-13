@@ -40,6 +40,9 @@ class Config:
             self.DSPACE_USER = "test"
             self.DSPACE_PASSWORD = "test"  # nosec # noqa: S105
             self.DSPACE_TIMEOUT = 3.0
+            self.LOCAL_DSPACE_API_URL = "mock://dspace.edu/server/api"
+            self.LOCAL_DSPACE_USER = "local_test"
+            self.LOCAL_DSPACE_PASSWORD = "local_test"  # nosec # noqa: S105
             self.INPUT_QUEUE = "test_queue_with_messages"
             self.LOG_FILTER = "true"
             self.LOG_LEVEL = "INFO"

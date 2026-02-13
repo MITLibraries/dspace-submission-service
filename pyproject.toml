@@ -6,6 +6,7 @@ dependencies = [
     "boto3",
     "click",
     "dspace-python-client",
+    "dspace-rest-client>=0.1.16",
     "sentry-sdk",
     "smart-open",
 ]
@@ -51,6 +52,7 @@ ignore_missing_imports = true
 
 [tool.uv]
 package = true
+override-dependencies = ["smart_open>=7.0.0"]
 
 [[tool.uv.index]]
 name = "pypi"
@@ -93,11 +95,13 @@ ignore = [
     "D200",
     "D212",
     "D415",
+    "EM102",
     "G004",
     "PLR0912",
     "PLR0913",
     "PLR0915",
     "S321",
+    "TRY003",
 ]
 
 # allow autofix behavior for specified rules

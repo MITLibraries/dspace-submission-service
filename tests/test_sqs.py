@@ -58,7 +58,7 @@ def test_write_message_to_queue(mocked_sqs, raw_attributes, raw_body):
     assert len(msgs) == 1
 
 
-def test_process(mocked_sqs, mocked_dspace):
+def test_process(mocked_sqs, mocked_dspace6):
     msgs = retrieve_messages_from_queue("input_queue_with_messages", 0)
 
     # confirm initial length of messages
@@ -79,7 +79,7 @@ def test_process(mocked_sqs, mocked_dspace):
     assert len(output_msgs) > 0
 
 
-def test_process_handles_handleable_message_errors(mocked_sqs, mocked_dspace):
+def test_process_handles_handleable_message_errors(mocked_sqs, mocked_dspace6):
     msgs = retrieve_messages_from_queue("bad_input_messages", 0)
     output_msgs = retrieve_messages_from_queue("empty_result_queue", 0)
     assert len(output_msgs) == 0
@@ -90,7 +90,7 @@ def test_process_handles_handleable_message_errors(mocked_sqs, mocked_dspace):
     assert len(output_msgs) == 1
 
 
-def test_message_loop(mocked_sqs, mocked_dspace):
+def test_message_loop(mocked_sqs, mocked_dspace6):
     # confirm initial length of messages
     # passing visibility as zero so the message_loop can access the messages
     msgs = retrieve_messages_from_queue("input_queue_with_messages", 0, 0)

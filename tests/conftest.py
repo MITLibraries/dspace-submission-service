@@ -6,9 +6,12 @@ import os
 import boto3
 import pytest
 import requests_mock
-from dspace import DSpaceClient
+from dspace import DSpaceClient as DSpace6Client
+from dspace_rest_client.client import DSpaceClient as DSpace8Client
 from moto import mock_aws
 from requests import exceptions
+
+from submitter.submission import Submission
 
 
 @pytest.fixture
@@ -53,7 +56,7 @@ def test_aws_user(aws_credentials):
 
 
 @pytest.fixture
-def mocked_dspace():
+def mocked_dspace6():
     """The following mock responses from DSpace based on the URL of the request.
 
     Fixtures below that prepare an SQS message, where specific collections or bitstreams
@@ -113,9 +116,34 @@ def mocked_dspace():
 
 
 @pytest.fixture
-def mocked_dspace_auth_failure():
+def mocked_dspace8():
+    with requests_mock.Mocker() as m:
+        m.post("mock://dspace.edu/server/api/authn/login")
+        m.get("mock://dspace.edu/server/api/authn/status", json={"authenticated": True})
+        m.get("mock://dspace.edu/server/api/pid/find", json={"uuid": "collection01"})
+        m.post("mock://dspace.edu/server/api/core/items", json={"uuid": "item01"})
+        m.post(
+            "mock://dspace.edu/server/api/core/items/item01/bundles",
+            json={"uuid": "bundle01"},
+        )
+        m.post(
+            "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams",
+            json={"uuid": "bitstream01"},
+        )
+        yield m
+
+
+@pytest.fixture
+def mocked_dspace6_auth_failure():
     with requests_mock.Mocker() as m:
         m.post("mock://dspace.edu/rest/login", status_code=401)
+        yield m
+
+
+@pytest.fixture
+def mocked_dspace8_auth_failure():
+    with requests_mock.Mocker() as m:
+        m.post("mock://dspace.edu/server/api/authn/login", status_code=401)
         yield m
 
 
@@ -164,10 +192,42 @@ def mocked_s3(aws_credentials):
 
 
 @pytest.fixture
-def test_client(mocked_dspace):
-    client = DSpaceClient("mock://dspace.edu/rest/")
+def test_dspace6_client(mocked_dspace6):
+    client = DSpace6Client("mock://dspace.edu/rest/")
     client.login("test", "test")
     return client
+
+
+@pytest.fixture
+def test_dspace8_client(mocked_dspace8):
+    client = DSpace8Client(
+        api_endpoint="mock://dspace.edu/server/api",
+        username="test",
+        password="test",  # noqa: S106
+        fake_user_agent=True,
+    )
+    client.authenticate()
+    return client
+
+
+@pytest.fixture
+def dspace8_submission_instance(test_dspace8_client):
+    submission = Submission(
+        destination="DSpace8Local",
+        collection_handle="0000/collection01",
+        metadata_location="tests/fixtures/test-item-metadata.json",
+        files=[
+            {
+                "BitstreamName": "test-file-01.pdf",
+                "FileLocation": "tests/fixtures/test-file-01.pdf",
+                "BitstreamDescription": "A test bitstream",
+            }
+        ],
+        result_queue=None,
+        attributes={},
+    )
+    submission.client = test_dspace8_client
+    return submission
 
 
 @pytest.fixture
