@@ -118,7 +118,7 @@ def test_get_metadata_entries_from_file_dspace6(mocked_dspace6):
         attributes=None,
         result_queue=None,
     )
-    metadata = submission.get_metadata_entries_from_file_dspace6()
+    metadata = submission._get_metadata_entries_from_file_dspace6()  # noqa: SLF001
     assert next(metadata) == {"key": "dc.title", "value": "Test Thesis"}
 
 
