@@ -129,6 +129,30 @@ class BitstreamPostError(Exception):
         self.dspace_error = source_error.response.text if source_error.response else None
 
 
+class BundlePostError(Exception):
+    """Exception raised when posting a bundle for an item in DSpace.
+
+    Args:
+        source_error: Originating Exception
+        item_handle: Handle of posted item that bundle belongs to
+
+    Attributes:
+        message (str): Explanation of the error
+        dspace_error (str): Error message returned by the DSpace server
+    """
+
+    def __init__(
+        self,
+        source_error: RequestException,
+        item_handle: str,
+    ):
+        self.message = (
+            f"Error occurred while posting bundle for item '{item_handle}' in "
+            "DSpace. Item and any bitstreams already posted to it will be deleted"
+        )
+        self.dspace_error = source_error.response.text if source_error.response else None
+
+
 class DSpaceTimeoutError(Exception):
     """Exception raised due to a DSpace server timeout.
 
