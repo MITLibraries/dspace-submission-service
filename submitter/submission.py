@@ -73,9 +73,9 @@ class Submission:
 
         try:
             if self.destination == "DSpace@MIT":  # Update after DSpace 8 migration
-                item = self._create_item_dspace6()
+                item = self._submit_item_dspace6()
             elif self.destination in ["DSpace8Local", "DSpace8MIT"]:
-                item = self._create_item_dspace8()
+                item = self._submit_item_dspace8()
             self.result_success_message(item)
 
         # Expected exception, generate error message and continue
@@ -210,7 +210,7 @@ class Submission:
             files=files,
         )
 
-    def _create_item_dspace6(  # Update after DSpace 8 migration
+    def _submit_item_dspace6(  # Update after DSpace 8 migration
         self,
     ) -> dspace.item.Item:
         """Create item instance with metadata entries from submission message."""
@@ -300,34 +300,37 @@ class Submission:
                     e, bitstream.name, partial_item_handle
                 ) from e
 
+    def _submit_item_dspace8(self) -> DSpace8Item:
+        """Submit item instance from submission message."""
+        item = self._create_item_dspace8()
+        item.bundle = self._create_bundle_dspace8(item)
+        item.bitstreams = []
+        for bitstream_uri in self.files or []:
+            self._create_bitstream_dspace8(item, bitstream_uri)
+        return item
+
     def _create_item_dspace8(self) -> DSpace8Item:
-        """Create item instance with metadata entries from submission message."""
-        # Verify the specified collection exists
-        collection = self.client.resolve_identifier_to_dso(
-            identifier=self.collection_handle
-        )
+        """Create item in DSpace from submission message."""
         try:
+            # Verify the specified collection exists
+            collection = self.client.resolve_identifier_to_dso(
+                identifier=self.collection_handle
+            )
             with smart_open.open(self.metadata_location, "r") as metadata:
                 item_data = {
                     "metadata": json.load(metadata),
                     "discoverable": True,
                     "type": "item",
                 }
-                new_item = self.client.create_item(
+                item = self.client.create_item(
                     parent=collection.uuid,
                     item=DSpace8Item(item_data),
                 )
-
         except Exception as e:
             logger.exception("Error creating item:")
             raise errors.ItemCreateError(e, self.metadata_location) from e
-
-        logger.info(f"Item created with handle: {new_item.handle}")
-        new_item.bundle = self._create_bundle_dspace8(new_item)
-        new_item.bitstreams = []
-        for bitstream_uri in self.files or []:
-            self._create_bitstream_dspace8(new_item, bitstream_uri)
-        return new_item
+        logger.info(f"Item created with handle: {item.handle}")
+        return item
 
     def _create_bundle_dspace8(self, item: DSpace8Item) -> DSpace8Bundle:
         """Create ORIGINAL bundle for a specified item."""

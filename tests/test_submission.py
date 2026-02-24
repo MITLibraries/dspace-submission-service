@@ -345,33 +345,33 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
     )
 
 
-def test_create_item_dspace8_success(dspace8_submission_instance):
-    item = dspace8_submission_instance._create_item_dspace8()
+def test_submit_item_dspace8_success(dspace8_submission_instance):
+    item = dspace8_submission_instance._submit_item_dspace8()
     assert item.uuid == "item01"
     assert len(item.bitstreams) == 2  # noqa: PLR2004
 
 
 @patch("submitter.submission.DSpace8Client.create_item")
-def test_create_item_dspace8_item_create_error(
+def test_submit_item_dspace8_item_create_error(
     mock_create_item, dspace8_submission_instance
 ):
     mock_create_item.side_effect = RequestException
     with pytest.raises(errors.ItemCreateError):
-        dspace8_submission_instance._create_item_dspace8()
+        dspace8_submission_instance._submit_item_dspace8()
 
 
 @patch("submitter.submission.DSpace8Client.create_bundle")
-def test_create_item_dspace8_bundle_create_error_raises_exception(
+def test_submit_item_dspace8_bundle_create_error_raises_exception(
     mock_create_bundle, dspace8_submission_instance, caplog
 ):
     mock_create_bundle.side_effect = RequestException
     with pytest.raises(errors.BundleCreateError):
-        dspace8_submission_instance._create_item_dspace8()
+        dspace8_submission_instance._submit_item_dspace8()
     assert "Error creating bundle:" in caplog.text
 
 
 @patch("submitter.submission.DSpace8Client.create_bitstream")
-def test_create_item_dspace8_bitstream_error_raises_exception(
+def test_submit_item_dspace8_bitstream_error_raises_exception(
     mock_create_bitstream,
     mocked_dspace8,
     dspace8_submission_instance,
@@ -380,19 +380,19 @@ def test_create_item_dspace8_bitstream_error_raises_exception(
     mock_create_bitstream.side_effect = RequestException
 
     with pytest.raises(errors.BitstreamCreateError):
-        dspace8_submission_instance._create_item_dspace8()
+        dspace8_submission_instance._submit_item_dspace8()
     assert "Error creating bitstream:" in caplog.text
 
 
 @patch("submitter.submission.DSpace8Client.create_bitstream")
-def test_create_item_dspace8_bitstream_error_triggers_cleanup(
+def test_submit_item_dspace8_bitstream_error_triggers_cleanup(
     mock_create_bitstream, mocked_dspace8, dspace8_submission_instance, caplog
 ):
     bitstream = DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
     mock_create_bitstream.side_effect = [bitstream, RequestException]
 
     with pytest.raises(errors.BitstreamCreateError):
-        dspace8_submission_instance._create_item_dspace8()
+        dspace8_submission_instance._submit_item_dspace8()
 
     assert "Error creating bitstream:" in caplog.text
     assert "Item '0000/item01' was partially posted to DSpace, cleaning up" in caplog.text
@@ -401,7 +401,7 @@ def test_create_item_dspace8_bitstream_error_triggers_cleanup(
 
 @patch("submitter.submission.DSpace8Client.delete_dso")
 @patch("submitter.submission.DSpace8Client.create_bitstream")
-def test_create_item_dspace8_bitstream_error_cleanup_failure_logs_exception(
+def test_submit_item_dspace8_bitstream_error_cleanup_failure_logs_exception(
     mock_create_bitstream, mock_delete_dso, dspace8_submission_instance, caplog
 ):
     bitstream = DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
@@ -409,7 +409,7 @@ def test_create_item_dspace8_bitstream_error_cleanup_failure_logs_exception(
     mock_delete_dso.side_effect = RequestException
 
     with pytest.raises(errors.BitstreamCreateError):
-        dspace8_submission_instance._create_item_dspace8()
+        dspace8_submission_instance._submit_item_dspace8()
 
     assert "Error creating bitstream:" in caplog.text
     assert "Item '0000/item01' was partially posted to DSpace, cleaning up" in caplog.text
