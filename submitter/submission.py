@@ -20,7 +20,6 @@ from dspace_rest_client.models import (
     Bundle as DSpace8Bundle,
 )  # Update after DSpace 8 migration
 from dspace_rest_client.models import Item as DSpace8Item
-from requests.exceptions import RequestException
 
 from submitter import CONFIG, errors
 
@@ -52,6 +51,56 @@ class Submission:
         self._dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
             {}
         )  # Update after DSpace 8 migration
+
+    def submit(self) -> None:
+        """Submit a submission to DSpace as a new item with associated bitstreams.
+
+        Creates a local item instance from the submission message, adds bitstream
+        objects, posts the item to DSpace, and posts each bitstream to the posted
+        item. Creates result success message if successful, otherwise creates
+        appropriate result error message based on the specific exception raised during
+        submission.
+
+        Raises:
+            DSpaceTimeoutError: If the DSpace server takes longer than the
+                configuration timeout setting to respond. Because this indicates a
+                serious error on the DSpace side, rather than handling this exception
+                it is re-raised with some useful message information and stops the
+                entire SQS message loop process until someone can investigate further.
+        """
+        if CONFIG.SKIP_PROCESSING != "true":
+            self.client = self.get_dspace_client()
+
+        try:
+            if self.destination == "DSpace@MIT":  # Update after DSpace 8 migration
+                item = self._create_item_dspace6()
+            elif self.destination in ["DSpace8Local", "DSpace8MIT"]:
+                item = self._create_item_dspace8()
+            self.result_success_message(item)
+
+        # Expected exception, generate error message and continue
+        except (
+            errors.ItemCreateError,
+            errors.BundleCreateError,
+            errors.BitstreamCreateError,
+            errors.ItemPostError,  # Update after DSpace 8 migration
+            errors.BitstreamAddError,  # Update after DSpace 8 migration
+            errors.BitstreamOpenError,  # Update after DSpace 8 migration
+            errors.BitstreamPostError,  # Update after DSpace 8 migration
+        ) as e:
+            self.result_error_message(e.message, getattr(e, "dspace_error", None))
+
+        # DSpace timeout error, abort
+        except requests.exceptions.Timeout as e:
+            dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
+            raise errors.DSpaceTimeoutError(dspace_url, self.result_attributes) from e
+
+        # Unexpected exception, abort
+        except Exception:
+            logger.exception(
+                "Unexpected exception, aborting DSpace Submission Service processing"
+            )
+            raise
 
     def get_dspace_client(
         self,
@@ -172,7 +221,7 @@ class Submission:
                 metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
                 item.metadata.append(metadata_entry)
         except KeyError as e:
-            raise errors.ItemCreateError(self.metadata_location) from e
+            raise errors.ItemCreateError(e, self.metadata_location) from e
 
         item = self._add_bitstreams_to_item_dspace6(item)
         self._post_item_dspace6(item, self.collection_handle)
@@ -253,93 +302,7 @@ class Submission:
 
     def _create_item_dspace8(self) -> DSpace8Item:
         """Create item instance with metadata entries from submission message."""
-        collection = self.client.resolve_identifier_to_dso(
-            identifier=self.collection_handle
-        )
-        with smart_open.open(self.metadata_location, "r") as metadata:
-            item_data = {
-                "metadata": json.load(metadata),
-                "discoverable": True,
-                "type": "item",
-            }
-
-            new_item = self.client.create_item(
-                parent=collection.uuid,
-                item=DSpace8Item(item_data),
-            )
-        if new_item.uuid:
-            logger.info(f"Item created with handle: {new_item.handle}")
-        new_item.bitstreams = []
-        for bitstream_uri in self.files or []:
-            self._create_bundle_and_bitstream(new_item, bitstream_uri)
-        return new_item
-
-    def _create_bundle_and_bitstream(self, item: DSpace8Item, bitstream: dict) -> None:
-        """Create a bundle and bitstream for a specified item."""
-        new_bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
-        if new_bundle.uuid:
-            logger.info(f"Bundle created with UUID: {new_bundle.uuid}")
-
-        new_bitstream = self.client.create_bitstream(
-            bundle=new_bundle,
-            name=os.path.basename(bitstream["BitstreamName"]),
-            path=bitstream["FileLocation"],
-        )
-        if new_bitstream.uuid:
-            logger.info(f"Bitstream created with UUID: {new_bitstream.uuid}")
-        item.bitstreams.append(new_bitstream)
-        return item
-
-    def _post_item_dspace6(  # Update after DSpace 8 migration
-        self,
-        item: dspace.item.Item,
-        collection_handle: str | None,
-    ) -> None:
-        """Post item with metadata to DSpace."""
-        try:
-            entries = [entry.to_dict() for entry in item.metadata]
-            logger.debug(
-                "Posting item to DSpace with metadata: %s",
-                json.dumps(entries, indent=2),
-            )
-            item.post(self.client, collection_handle=collection_handle)
-            logger.error("Posted item to Dspace with handle '%s'", item.handle)
-        except requests.exceptions.Timeout:
-            raise
-        except requests.exceptions.HTTPError as e:
-            raise errors.ItemPostError(e, collection_handle) from e
-
-    def _post_bitstreams_dspace6(  # Update after DSpace 8 migration
-        self, item: dspace.item.Item
-    ) -> None:
-        """Post all bitstreams to an existing DSpace item."""
-        logger.error(
-            "Posting %d bitstream(s) to item '%s' in DSpace",
-            len(item.bitstreams),
-            item.handle,
-        )
-        for bitstream in item.bitstreams:
-            try:
-                bitstream.post(self.client, item_uuid=item.uuid)
-                logger.debug(
-                    "Posted bitstream '%s' to item '%s', new bitstream uuid is '%s'",
-                    bitstream.name,
-                    item.handle,
-                    bitstream.uuid,
-                )
-            except (FileNotFoundError, RequestException) as e:
-                partial_item_handle = item.handle
-                self.clean_up_partial_success_dspace6(item)
-                if isinstance(e, FileNotFoundError):
-                    raise errors.BitstreamOpenError(
-                        bitstream.file_path, partial_item_handle
-                    ) from e
-                raise errors.BitstreamPostError(
-                    e, bitstream.name, partial_item_handle
-                ) from e
-
-    def _create_item_dspace8(self) -> DSpace8Item:
-        """Create item instance with metadata entries from submission message."""
+        # Verify the specified collection exists
         collection = self.client.resolve_identifier_to_dso(
             identifier=self.collection_handle
         )
@@ -350,49 +313,49 @@ class Submission:
                     "discoverable": True,
                     "type": "item",
                 }
-
                 new_item = self.client.create_item(
                     parent=collection.uuid,
                     item=DSpace8Item(item_data),
                 )
-            logger.info(f"Item created with handle: {new_item.handle}")
+
         except Exception as e:
             logger.exception("Error creating item:")
-            raise errors.ItemCreateError(self.metadata_location) from e
+            raise errors.ItemCreateError(e, self.metadata_location) from e
 
+        logger.info(f"Item created with handle: {new_item.handle}")
         new_item.bundle = self._create_bundle_dspace8(new_item)
         new_item.bitstreams = []
         for bitstream_uri in self.files or []:
-            self._create_bitstreams_dspace8(new_item, bitstream_uri)
+            self._create_bitstream_dspace8(new_item, bitstream_uri)
         return new_item
 
     def _create_bundle_dspace8(self, item: DSpace8Item) -> DSpace8Bundle:
         """Create ORIGINAL bundle for a specified item."""
         try:
             new_bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
-            logger.info(f"Bundle created with UUID: {new_bundle.uuid}")
-        except RequestException as e:
+        except Exception as e:
             logger.exception("Error creating bundle:")
             self.clean_up_partial_success_dspace8(item)
-            raise errors.BundlePostError(e, item.handle) from e
+            raise errors.BundleCreateError(e, item.handle) from e
+        logger.info(f"Bundle created with UUID: {new_bundle.uuid}")
         return new_bundle
 
-    def _create_bitstreams_dspace8(self, item: DSpace8Item, bitstream: dict) -> None:
-        """Create bitstreams for a specified item bundle."""
+    def _create_bitstream_dspace8(self, item: DSpace8Item, bitstream: dict) -> None:
+        """Create bitstream for a specified item bundle."""
         try:
             new_bitstream = self.client.create_bitstream(
                 bundle=item.bundle,
                 name=os.path.basename(bitstream["BitstreamName"]),
                 path=bitstream["FileLocation"],
             )
-            logger.info(f"Bitstream created with UUID: {new_bitstream.uuid}")
-            item.bitstreams.append(new_bitstream)
-        except RequestException as e:
+        except Exception as e:
             logger.exception("Error creating bitstream:")
             self.clean_up_partial_success_dspace8(item)
-            raise errors.BitstreamPostError(
+            raise errors.BitstreamCreateError(
                 e, bitstream["BitstreamName"], item.handle
             ) from e
+        logger.info(f"Bitstream created with UUID: {new_bitstream.uuid}")
+        item.bitstreams.append(new_bitstream)
 
     def result_error_message(
         self, message: str, dspace_response: str | None = None
@@ -425,55 +388,6 @@ class Submission:
                     "BitstreamChecksum": bitstream.checkSum,
                 }
             )
-
-    def submit(self) -> None:
-        """Submit a submission to DSpace as a new item with associated bitstreams.
-
-        Creates a local item instance from the submission message, adds bitstream
-        objects, posts the item to DSpace, and posts each bitstream to the posted
-        item. Creates result success message if successful, otherwise creates
-        appropriate result error message based on the specific exception raised during
-        submission.
-
-        Raises:
-            DSpaceTimeoutError: If the DSpace server takes longer than the
-                configuration timeout setting to respond. Because this indicates a
-                serious error on the DSpace side, rather than handling this exception
-                it is re-raised with some useful message information and stops the
-                entire SQS message loop process until someone can investigate further.
-        """
-        if CONFIG.SKIP_PROCESSING != "true":
-            self.client = self.get_dspace_client()
-
-        try:
-            if self.destination == "DSpace@MIT":  # Update after DSpace 8 migration
-                item = self._create_item_dspace6()
-            elif self.destination in ["DSpace8Local", "DSpace8MIT"]:
-                item = self._create_item_dspace8()
-            self.result_success_message(item)
-
-        # Handle DSpace timeout errors
-        except requests.exceptions.Timeout as e:
-            dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
-            raise errors.DSpaceTimeoutError(dspace_url, self.result_attributes) from e
-
-        # Handle expected exceptions
-        except (  # Update after DSpace 8 migration
-            errors.ItemCreateError,
-            errors.ItemPostError,
-            errors.BitstreamAddError,
-            errors.BitstreamOpenError,
-            errors.BitstreamPostError,
-            errors.BundlePostError,
-        ) as e:
-            self.result_error_message(e.message, getattr(e, "dspace_error", None))
-
-        # Handled unexpected exceptions
-        except Exception:
-            logger.exception(
-                "Unexpected exception, aborting DSpace Submission Service processing"
-            )
-            raise
 
     def clean_up_partial_success_dspace6(self, item: dspace.item.Item) -> None:
         logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
