@@ -13,6 +13,7 @@ import smart_open
 from dspace.client import (
     DSpaceClient as DSpace6Client,
 )  # Update after DSpace 8 migration
+from dspace.item import Item as DSpace6Item  # Update after DSpace 8 migration
 from dspace_rest_client.client import (
     DSpaceClient as DSpace8Client,
 )  # Update after DSpace 8 migration
@@ -212,10 +213,10 @@ class Submission:
 
     def _submit_item_dspace6(  # Update after DSpace 8 migration
         self,
-    ) -> dspace.item.Item:
+    ) -> DSpace6Item:
         """Create item instance with metadata entries from submission message."""
         logger.debug("Creating local item instance from submission message")
-        item = dspace.item.Item()
+        item = DSpace6Item()
         try:
             for entry in self._get_metadata_entries_from_file_dspace6():
                 metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
@@ -236,8 +237,8 @@ class Submission:
         yield from metadata["metadata"]
 
     def _add_bitstreams_to_item_dspace6(  # Update after DSpace 8 migration
-        self, item: dspace.item.Item
-    ) -> dspace.item.Item:
+        self, item: DSpace6Item
+    ) -> DSpace6Item:
         """Add bitstreams to item from files in submission message."""
         logger.debug("Adding bitstreams to local item instance from submission message")
         try:
@@ -254,7 +255,7 @@ class Submission:
 
     def _post_item_dspace6(  # Update after DSpace 8 migration
         self,
-        item: dspace.item.Item,
+        item: DSpace6Item,
         collection_handle: str | None,
     ) -> None:
         """Post item with metadata to DSpace."""
@@ -272,7 +273,7 @@ class Submission:
             raise errors.ItemPostError(e, collection_handle) from e
 
     def _post_bitstreams_dspace6(  # Update after DSpace 8 migration
-        self, item: dspace.item.Item
+        self, item: DSpace6Item
     ) -> None:
         """Post all bitstreams to an existing DSpace item."""
         logger.error(
@@ -372,7 +373,7 @@ class Submission:
             "ExceptionTraceback": prettify(tb),
         }
 
-    def result_success_message(self, item: dspace.item.Item | DSpace8Item) -> None:
+    def result_success_message(self, item: DSpace6Item | DSpace8Item) -> None:
         """Set result message on Submission object on successful submit."""
         self.result_message = {
             "ResultType": "success",
@@ -380,10 +381,14 @@ class Submission:
             "lastModified": item.lastModified,
             "Bitstreams": [],
         }
-        if isinstance(item, dspace.item.Item):
+        if isinstance(item, DSpace6Item):  # Update after DSpace 8 migration
             bitstreams = item.bitstreams
-        if isinstance(item, DSpace8Item):
+        elif isinstance(item, DSpace8Item):
             bitstreams = self.client.get_bitstreams(bundle=item.bundle)
+        else:
+            raise TypeError(
+                "Item is neither a 'DSpace6Item' or a 'DSpace8Item'."  # noqa: EM101
+            )
         for bitstream in bitstreams:
             self.result_message["Bitstreams"].append(
                 {
@@ -393,7 +398,7 @@ class Submission:
                 }
             )
 
-    def clean_up_partial_success_dspace6(self, item: dspace.item.Item) -> None:
+    def clean_up_partial_success_dspace6(self, item: DSpace6Item) -> None:
         logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
         handle = item.handle
         for bitstream in item.bitstreams:
