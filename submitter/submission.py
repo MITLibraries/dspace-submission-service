@@ -304,7 +304,6 @@ class Submission:
         """Submit item instance from submission message."""
         item = self._create_item_dspace8()
         item.bundle = self._create_bundle_dspace8(item)
-        item.bitstreams = []
         for bitstream_uri in self.files or []:
             self._create_bitstream_dspace8(item, bitstream_uri)
         return item
@@ -335,30 +334,29 @@ class Submission:
     def _create_bundle_dspace8(self, item: DSpace8Item) -> DSpace8Bundle:
         """Create ORIGINAL bundle for a specified item."""
         try:
-            new_bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
+            bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
         except Exception as e:
             logger.exception("Error creating bundle:")
             self.clean_up_partial_success_dspace8(item)
             raise errors.BundleCreateError(e, item.handle) from e
-        logger.info(f"Bundle created with UUID: {new_bundle.uuid}")
-        return new_bundle
+        logger.info(f"Bundle created with UUID: {bundle.uuid}")
+        return bundle
 
-    def _create_bitstream_dspace8(self, item: DSpace8Item, bitstream: dict) -> None:
+    def _create_bitstream_dspace8(self, item: DSpace8Item, bitstream_data: dict) -> None:
         """Create bitstream for a specified item bundle."""
         try:
-            new_bitstream = self.client.create_bitstream(
+            bitstream = self.client.create_bitstream(
                 bundle=item.bundle,
-                name=os.path.basename(bitstream["BitstreamName"]),
-                path=bitstream["FileLocation"],
+                name=os.path.basename(bitstream_data["BitstreamName"]),
+                path=bitstream_data["FileLocation"],
             )
         except Exception as e:
             logger.exception("Error creating bitstream:")
             self.clean_up_partial_success_dspace8(item)
             raise errors.BitstreamCreateError(
-                e, bitstream["BitstreamName"], item.handle
+                e, bitstream_data["BitstreamName"], item.handle
             ) from e
-        logger.info(f"Bitstream created with UUID: {new_bitstream.uuid}")
-        item.bitstreams.append(new_bitstream)
+        logger.info(f"Bitstream created with UUID: {bitstream.uuid}")
 
     def result_error_message(
         self, message: str, dspace_response: str | None = None
@@ -374,7 +372,7 @@ class Submission:
             "ExceptionTraceback": prettify(tb),
         }
 
-    def result_success_message(self, item: dspace.item.Item) -> None:
+    def result_success_message(self, item: dspace.item.Item | DSpace8Item) -> None:
         """Set result message on Submission object on successful submit."""
         self.result_message = {
             "ResultType": "success",
@@ -382,8 +380,11 @@ class Submission:
             "lastModified": item.lastModified,
             "Bitstreams": [],
         }
-
-        for bitstream in item.bitstreams:
+        if isinstance(item, dspace.item.Item):
+            bitstreams = item.bitstreams
+        if isinstance(item, DSpace8Item):
+            bitstreams = self.client.get_bitstreams(bundle=item.bundle)
+        for bitstream in bitstreams:
             self.result_message["Bitstreams"].append(
                 {
                     "BitstreamName": bitstream.name,

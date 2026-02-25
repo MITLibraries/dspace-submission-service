@@ -8,6 +8,8 @@ from dspace import Bitstream, Item
 from dspace.client import DSpaceClient as DSpace6Client
 from dspace_rest_client.client import DSpaceClient as DSpace8Client
 from dspace_rest_client.models import Bitstream as DSpace8Bitstream
+from dspace_rest_client.models import Bundle as DSpace8Bundle
+from dspace_rest_client.models import Item as DSpace8Item
 from freezegun import freeze_time
 from requests.exceptions import RequestException
 
@@ -178,7 +180,8 @@ def test_result_success_message_dspace6(input_message_good, mocked_dspace6):
     ]
 
 
-def test_result_success_message_dspace8(input_message_good, mocked_dspace8):
+@patch("submitter.submission.DSpace8Client.get_bitstreams")
+def test_result_success_message_dspace8(mock_get_bitstreams, dspace8_submission_instance):
     bitstream = DSpace8Bitstream(
         {
             "uuid": "1234-5678-9000",
@@ -187,18 +190,21 @@ def test_result_success_message_dspace8(input_message_good, mocked_dspace8):
             "checkSumAlgorithm": "MD5",
         }
     )
+    mock_get_bitstreams.return_value = [bitstream]
 
-    item = Item()
-    item.handle = "0000/12345"
-    item.lastModified = "yesterday"
-    item.bitstreams = [bitstream]
+    item = DSpace8Item(
+        {
+            "handle": "0000/12345",
+            "lastModified": "yesterday",
+        }
+    )
+    item.bundle = DSpace8Bundle({"uuid": "bundle01"})
 
-    submission = Submission.from_message(input_message_good)
-    submission.result_success_message(item)
-    assert submission.result_message["ResultType"] == "success"
-    assert submission.result_message["ItemHandle"] == item.handle
-    assert submission.result_message["lastModified"] == item.lastModified
-    assert submission.result_message["Bitstreams"] == [
+    dspace8_submission_instance.result_success_message(item)
+    assert dspace8_submission_instance.result_message["ResultType"] == "success"
+    assert dspace8_submission_instance.result_message["ItemHandle"] == item.handle
+    assert dspace8_submission_instance.result_message["lastModified"] == item.lastModified
+    assert dspace8_submission_instance.result_message["Bitstreams"] == [
         {
             "BitstreamName": bitstream.name,
             "BitstreamUUID": bitstream.uuid,
@@ -217,7 +223,11 @@ def test_submit_dspace6_success(
     assert submission.result_message["ResultType"] == "success"
 
 
-def test_submit_dspace8_success(dspace8_submission_instance):
+@patch("submitter.submission.DSpace8Client.get_bitstreams")
+def test_submit_dspace8_success(mock_get_bitstreams, dspace8_submission_instance):
+    mock_get_bitstreams.return_value = [
+        DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
+    ]
     dspace8_submission_instance.submit()
     assert dspace8_submission_instance.result_message["ResultType"] == "success"
 
@@ -348,7 +358,7 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
 def test_submit_item_dspace8_success(dspace8_submission_instance):
     item = dspace8_submission_instance._submit_item_dspace8()
     assert item.uuid == "item01"
-    assert len(item.bitstreams) == 2  # noqa: PLR2004
+    assert item.bundle.uuid == "bundle01"
 
 
 @patch("submitter.submission.DSpace8Client.create_item")
