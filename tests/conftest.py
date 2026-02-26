@@ -121,7 +121,11 @@ def mocked_dspace8():
         m.post("mock://dspace.edu/server/api/authn/login")
         m.get("mock://dspace.edu/server/api/authn/status", json={"authenticated": True})
         m.get("mock://dspace.edu/server/api/pid/find", json={"uuid": "collection01"})
-        m.post("mock://dspace.edu/server/api/core/items", json={"uuid": "item01"})
+        m.post(
+            "mock://dspace.edu/server/api/core/items",
+            json={"uuid": "item01", "handle": "0000/item01"},
+        )
+        m.delete("mock://dspace.edu/server/api/core/items/item01", status_code=200)
         m.post(
             "mock://dspace.edu/server/api/core/items/item01/bundles",
             json={"uuid": "bundle01"},
@@ -221,7 +225,12 @@ def dspace8_submission_instance(test_dspace8_client):
                 "BitstreamName": "test-file-01.pdf",
                 "FileLocation": "tests/fixtures/test-file-01.pdf",
                 "BitstreamDescription": "A test bitstream",
-            }
+            },
+            {
+                "BitstreamName": "test-file-02.pdf",
+                "FileLocation": "tests/fixtures/test-file-01.pdf",
+                "BitstreamDescription": "Another test bitstream",
+            },
         ],
         result_queue=None,
         attributes={},

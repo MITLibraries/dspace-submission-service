@@ -1,3 +1,4 @@
+# ruff: noqa: SLF001
 import sys
 import traceback
 from unittest.mock import patch
@@ -6,6 +7,9 @@ import pytest
 from dspace import Bitstream, Item
 from dspace.client import DSpaceClient as DSpace6Client
 from dspace_rest_client.client import DSpaceClient as DSpace8Client
+from dspace_rest_client.models import Bitstream as DSpace8Bitstream
+from dspace_rest_client.models import Bundle as DSpace8Bundle
+from dspace_rest_client.models import Item as DSpace8Item
 from freezegun import freeze_time
 from requests.exceptions import RequestException
 
@@ -118,7 +122,7 @@ def test_get_metadata_entries_from_file_dspace6(mocked_dspace6):
         attributes=None,
         result_queue=None,
     )
-    metadata = submission.get_metadata_entries_from_file_dspace6()
+    metadata = submission._get_metadata_entries_from_file_dspace6()
     assert next(metadata) == {"key": "dc.title", "value": "Test Thesis"}
 
 
@@ -130,6 +134,21 @@ def test_result_error_message_dspace6(input_message_good, mocked_dspace6):
     assert submission.result_message["ErrorTimestamp"] == "2021-09-01 05:06:07"
     assert submission.result_message["ErrorInfo"] == "A test error"
     assert submission.result_message["DSpaceResponse"] == "N/A"
+    assert submission.result_message["ExceptionTraceback"] == prettify(
+        traceback.format_exception(*sys.exc_info())
+    )
+
+
+@freeze_time("2021-09-01 05:06:07")
+def test_result_error_message_dspace8(input_message_item_create_error, mocked_dspace8):
+    submission = Submission.from_message(input_message_item_create_error)
+    submission.result_error_message(
+        "A test error", dspace_response="A test DSpace response"
+    )
+    assert submission.result_message["ResultType"] == "error"
+    assert submission.result_message["ErrorTimestamp"] == "2021-09-01 05:06:07"
+    assert submission.result_message["ErrorInfo"] == "A test error"
+    assert submission.result_message["DSpaceResponse"] == "A test DSpace response"
     assert submission.result_message["ExceptionTraceback"] == prettify(
         traceback.format_exception(*sys.exc_info())
     )
@@ -161,6 +180,39 @@ def test_result_success_message_dspace6(input_message_good, mocked_dspace6):
     ]
 
 
+@patch("submitter.submission.DSpace8Client.get_bitstreams")
+def test_result_success_message_dspace8(mock_get_bitstreams, dspace8_submission_instance):
+    bitstream = DSpace8Bitstream(
+        {
+            "uuid": "1234-5678-9000",
+            "name": "A test bitstream",
+            "checkSum": "a4e0f4930dfaff904fa3c6c85b0b8ecc",
+            "checkSumAlgorithm": "MD5",
+        }
+    )
+    mock_get_bitstreams.return_value = [bitstream]
+
+    item = DSpace8Item(
+        {
+            "handle": "0000/12345",
+            "lastModified": "yesterday",
+        }
+    )
+    item.bundle = DSpace8Bundle({"uuid": "bundle01"})
+
+    dspace8_submission_instance.result_success_message(item)
+    assert dspace8_submission_instance.result_message["ResultType"] == "success"
+    assert dspace8_submission_instance.result_message["ItemHandle"] == item.handle
+    assert dspace8_submission_instance.result_message["lastModified"] == item.lastModified
+    assert dspace8_submission_instance.result_message["Bitstreams"] == [
+        {
+            "BitstreamName": bitstream.name,
+            "BitstreamUUID": bitstream.uuid,
+            "BitstreamChecksum": bitstream.checkSum,
+        }
+    ]
+
+
 @patch("submitter.submission.DSpace6Client")
 def test_submit_dspace6_success(
     mock_dspace_client, test_dspace6_client, mocked_dspace6, input_message_good
@@ -171,7 +223,11 @@ def test_submit_dspace6_success(
     assert submission.result_message["ResultType"] == "success"
 
 
-def test_submit_dspace8_success(dspace8_submission_instance):
+@patch("submitter.submission.DSpace8Client.get_bitstreams")
+def test_submit_dspace8_success(mock_get_bitstreams, dspace8_submission_instance):
+    mock_get_bitstreams.return_value = [
+        DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
+    ]
     dspace8_submission_instance.submit()
     assert dspace8_submission_instance.result_message["ResultType"] == "success"
 
@@ -299,7 +355,72 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
     )
 
 
-def test_create_item_dspace8_success(dspace8_submission_instance):
-    item = dspace8_submission_instance._create_item_dspace8()  # noqa: SLF001
+def test_submit_item_dspace8_success(dspace8_submission_instance):
+    item = dspace8_submission_instance._submit_item_dspace8()
     assert item.uuid == "item01"
-    assert item.bitstreams[0].uuid == "bitstream01"
+    assert item.bundle.uuid == "bundle01"
+
+
+@patch("submitter.submission.DSpace8Client.create_item")
+def test_submit_item_dspace8_item_create_error(
+    mock_create_item, dspace8_submission_instance
+):
+    mock_create_item.side_effect = RequestException
+    with pytest.raises(errors.ItemCreateError):
+        dspace8_submission_instance._submit_item_dspace8()
+
+
+@patch("submitter.submission.DSpace8Client.create_bundle")
+def test_submit_item_dspace8_bundle_create_error_raises_exception(
+    mock_create_bundle, dspace8_submission_instance, caplog
+):
+    mock_create_bundle.side_effect = RequestException
+    with pytest.raises(errors.BundleCreateError):
+        dspace8_submission_instance._submit_item_dspace8()
+    assert "Error creating bundle:" in caplog.text
+
+
+@patch("submitter.submission.DSpace8Client.create_bitstream")
+def test_submit_item_dspace8_bitstream_error_raises_exception(
+    mock_create_bitstream,
+    mocked_dspace8,
+    dspace8_submission_instance,
+    caplog,
+):
+    mock_create_bitstream.side_effect = RequestException
+
+    with pytest.raises(errors.BitstreamCreateError):
+        dspace8_submission_instance._submit_item_dspace8()
+    assert "Error creating bitstream:" in caplog.text
+
+
+@patch("submitter.submission.DSpace8Client.create_bitstream")
+def test_submit_item_dspace8_bitstream_error_triggers_cleanup(
+    mock_create_bitstream, mocked_dspace8, dspace8_submission_instance, caplog
+):
+    bitstream = DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
+    mock_create_bitstream.side_effect = [bitstream, RequestException]
+
+    with pytest.raises(errors.BitstreamCreateError):
+        dspace8_submission_instance._submit_item_dspace8()
+
+    assert "Error creating bitstream:" in caplog.text
+    assert "Item '0000/item01' was partially posted to DSpace, cleaning up" in caplog.text
+    assert "Item '0000/item01' deleted from DSpace" in caplog.text
+
+
+@patch("submitter.submission.DSpace8Client.delete_dso")
+@patch("submitter.submission.DSpace8Client.create_bitstream")
+def test_submit_item_dspace8_bitstream_error_cleanup_failure_logs_exception(
+    mock_create_bitstream, mock_delete_dso, dspace8_submission_instance, caplog
+):
+    bitstream = DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
+    mock_create_bitstream.side_effect = [bitstream, RequestException]
+    mock_delete_dso.side_effect = RequestException
+
+    with pytest.raises(errors.BitstreamCreateError):
+        dspace8_submission_instance._submit_item_dspace8()
+
+    assert "Error creating bitstream:" in caplog.text
+    assert "Item '0000/item01' was partially posted to DSpace, cleaning up" in caplog.text
+    assert "Failed to delete DSpace item '0000/item01'" in caplog.text

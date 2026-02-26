@@ -31,22 +31,72 @@ class ItemCreateError(Exception):
     """Exception raised when creating an item instance from a submission message.
 
     Args:
+        exception: The exception raised during item creation
         metadata_file: Location of the metadata JSON file specified in the submission
             message
 
     Attributes:
         message (str): Explanation of the error
+        dspace_error (str): Error message returned by the DSpace server, if applicable
 
     """
 
-    def __init__(self, metadata_file: str | None):
+    def __init__(self, exception: Exception, metadata_file: str | None):
         self.message = (
             "Error occurred while creating item metadata entries from file "
             f"'{metadata_file}'"
         )
+        if isinstance(exception, RequestException) and exception.response is not None:
+            self.dspace_error = exception.response.text
 
 
-class ItemPostError(Exception):
+class BundleCreateError(Exception):
+    """Exception raised when posting a bundle for an item in DSpace.
+
+    Args:
+        exception: The exception raised during bundle creation
+        item_handle: Handle of posted item that bundle belongs to
+
+    Attributes:
+        message (str): Explanation of the error
+        dspace_error (str): Error message returned by the DSpace server, if applicable
+    """
+
+    def __init__(
+        self,
+        exception: Exception,
+        item_handle: str,
+    ):
+        self.message = (
+            f"Error occurred while posting bundle for item '{item_handle}' in "
+            "DSpace. Item and any bitstreams already posted to it will be deleted"
+        )
+        if isinstance(exception, RequestException) and exception.response is not None:
+            self.dspace_error = exception.response.text
+
+
+class BitstreamCreateError(Exception):
+    """Exception raised when creating a bitstream instance from a submission message.
+
+    Args:
+        exception: The exception raised during bitstream creation
+        bitstream_file: Location of the bitstream file specified in the submission
+            message
+    Attributes:
+        message (str): Explanation of the error
+        dspace_error (str): Error message returned by the DSpace server, if applicable
+    """
+
+    def __init__(self, exception: Exception, bitstream_file: str, item_handle: str):
+        self.message = (
+            f"Error occurred while creating bitstream from file '{bitstream_file}' "
+            f"for item '{item_handle}'"
+        )
+        if isinstance(exception, RequestException) and exception.response is not None:
+            self.dspace_error = exception.response.text
+
+
+class ItemPostError(Exception):  # Update after DSpace 8 migration
     """Exception raised when posting an item to DSpace.
 
     Args:
@@ -70,7 +120,7 @@ class ItemPostError(Exception):
         self.dspace_error = source_error.response.text if source_error.response else None
 
 
-class BitstreamAddError(Exception):
+class BitstreamAddError(Exception):  # Update after DSpace 8 migration
     """Exception raised when adding bitstream objects to an item instance.
 
     Attributes:
@@ -84,7 +134,7 @@ class BitstreamAddError(Exception):
         )
 
 
-class BitstreamOpenError(Exception):
+class BitstreamOpenError(Exception):  # Update after DSpace 8 migration
     """Exception raised when opening a file to post as a bitstream to DSpace.
 
     Args:
@@ -102,7 +152,7 @@ class BitstreamOpenError(Exception):
         )
 
 
-class BitstreamPostError(Exception):
+class BitstreamPostError(Exception):  # Update after DSpace 8 migration
     """Exception raised when posting a bitstream to DSpace.
 
     Args:
