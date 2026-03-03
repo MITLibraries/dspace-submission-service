@@ -266,7 +266,7 @@ class Submission:
                 json.dumps(entries, indent=2),
             )
             item.post(self.client, collection_handle=collection_handle)
-            logger.error("Posted item to Dspace with handle '%s'", item.handle)
+            logger.debug("Posted item to Dspace with handle '%s'", item.handle)
         except requests.exceptions.Timeout:
             raise
         except requests.exceptions.HTTPError as e:
@@ -276,7 +276,7 @@ class Submission:
         self, item: DSpace6Item
     ) -> None:
         """Post all bitstreams to an existing DSpace item."""
-        logger.error(
+        logger.debug(
             "Posting %d bitstream(s) to item '%s' in DSpace",
             len(item.bitstreams),
             item.handle,
