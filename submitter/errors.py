@@ -179,6 +179,21 @@ class BitstreamPostError(Exception):  # Update after DSpace 8 migration
         self.dspace_error = source_error.response.text if source_error.response else None
 
 
+class DSpaceObjectNotFoundError(Exception):
+    """Exception raised when the client cannot find a DSpace object for identifier.
+
+    This error is raised when Submission.client.resolve_identifier_to_dso
+    returns None, which means either an object was not found or the
+    identifier could not be resolved.
+    """
+
+    def __init__(self, identifier: str) -> None:
+        self.message = (
+            "Error occurred while retrieving item from DSpace."
+            f"No DSpace Object linked to the identifier '{identifier}'"
+        )
+
+
 class DSpaceTimeoutError(Exception):
     """Exception raised due to a DSpace server timeout.
 

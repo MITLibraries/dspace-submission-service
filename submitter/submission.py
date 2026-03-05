@@ -5,7 +5,7 @@ import sys
 import traceback
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import dspace
 import requests
@@ -29,6 +29,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+VALID_ITEM_OPERATIONS = ["create", "update"]
+
 
 class Submission:
     def __init__(
@@ -38,11 +40,15 @@ class Submission:
         *,
         result_message: dict | str | None = None,
         destination: str | None = None,
+        operation: Literal["create", "update"] | None = "create",
+        item_handle: str | None = None,
         collection_handle: str | None = None,
         metadata_location: str | None = None,
         files: list[dict] | None = None,
     ) -> None:
         self.destination = destination
+        self.operation = operation
+        self.item_handle = item_handle
         self.collection_handle = collection_handle
         self.metadata_location = metadata_location
         self.files = files
@@ -52,6 +58,9 @@ class Submission:
         self._dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
             {}
         )  # Update after DSpace 8 migration
+
+        if operation not in VALID_ITEM_OPERATIONS:
+            raise ValueError(f"Operation must be one of {VALID_ITEM_OPERATIONS}")
 
     def submit(self) -> None:
         """Submit a submission to DSpace as a new item with associated bitstreams.
@@ -187,10 +196,17 @@ class Submission:
 
         try:
             body = json.loads(message.body)
-            destination = body["SubmissionSystem"]
-            collection_handle = body["CollectionHandle"]
-            metadata_location = body["MetadataLocation"]
-            files = body["Files"]
+            operation = body.get("Operation", "create")
+            message_body_fields = {
+                "destination": body["SubmissionSystem"],
+                "operation": operation,
+                "collection_handle": body["CollectionHandle"],
+                "metadata_location": body["MetadataLocation"],
+                "files": body["Files"],
+            }
+
+            if operation == "update":
+                message_body_fields["item_handle"] = body["ItemHandle"]
         except (json.JSONDecodeError, KeyError, TypeError):
             result_message = (
                 "Submission message did not conform to the DSS specification. Message "
@@ -202,14 +218,7 @@ class Submission:
                 result_message=result_message,
             )
 
-        return cls(
-            attributes,
-            result_queue,
-            destination=destination,
-            collection_handle=collection_handle,
-            metadata_location=metadata_location,
-            files=files,
-        )
+        return cls(attributes, result_queue, **message_body_fields)
 
     def _submit_item_dspace6(  # Update after DSpace 8 migration
         self,
@@ -303,19 +312,30 @@ class Submission:
 
     def _submit_item_dspace8(self) -> DSpace8Item:
         """Submit item instance from submission message."""
-        item = self._create_item_dspace8()
-        item.bundle = self._create_bundle_dspace8(item)
-        for bitstream_uri in self.files or []:
-            self._create_bitstream_dspace8(item, bitstream_uri)
+        if self.operation == "create":
+            item = self._create_item_dspace8()
+            item.bundle = self._create_bundle_dspace8(item)
+            for bitstream_uri in self.files or []:
+                self._create_bitstream_dspace8(item, bitstream_uri)
+        else:
+            item = self._update_item_dspace8()
         return item
 
     def _create_item_dspace8(self) -> DSpace8Item:
         """Create item in DSpace from submission message."""
-        try:
-            # Verify the specified collection exists
-            collection = self.client.resolve_identifier_to_dso(
-                identifier=self.collection_handle
+        if not self.collection_handle:
+            raise ValueError(
+                "The 'collection_handle' attribute must be a non-empty string"  # noqa: EM101
             )
+
+        # verify the specified collection exists
+        collection = self.client.resolve_identifier_to_dso(
+            identifier=self.collection_handle
+        )
+        if not collection:
+            raise errors.DSpaceObjectNotFoundError(self.collection_handle)
+
+        try:
             with smart_open.open(self.metadata_location, "r") as metadata:
                 item_data = {
                     "metadata": json.load(metadata),
@@ -358,6 +378,57 @@ class Submission:
                 e, bitstream_data["BitstreamName"], item.handle
             ) from e
         logger.info(f"Bitstream created with UUID: {bitstream.uuid}")
+
+    def _update_item_dspace8(self) -> DSpace8Item:
+        """Update item in DSpace.
+
+        This method performs a full replacement of the metadata and bitstreams
+        for an item.
+        """
+        if not self.item_handle:
+            raise ValueError(
+                "The 'item_handle' attribute must be a non-empty string"  # noqa: EM101
+            )
+
+        item = self.client.resolve_identifier_to_dso(identifier=self.item_handle)
+        if not item:
+            raise errors.DSpaceObjectNotFoundError(self.item_handle)
+
+        self._update_metadata(item)
+        self._update_bitstreams(item)
+        return item
+
+    def _update_metadata(self, item: DSpace8Item) -> None:
+        """Update item in DSpace with metadata from Submission.
+
+        Given the item handle, this method retrieves the Item object from DSpace
+        and attaches the updated metadata into the object. This results in a full
+        replacement of the item's metadata.
+        """
+        with smart_open.open(self.metadata_location, "r") as metadata:
+            updated_metadata = json.load(metadata)
+
+        item.metadata = updated_metadata
+        self.client.update_item(item)
+
+    def _update_bitstreams(self, item: DSpace8Item) -> None:
+        """Update bitstreams for an item in DSpace.
+
+        This method deletes any bundle assigned the name 'ORIGINAL', which
+        assumes that an item's bitstreams are contained only within this bundle.
+        Once deleted, the method creates a new bundle with the same name.
+        THe method then creates new bitstreams from Submission.files. This results
+        in a full replacement of the item's bitstreams.
+        """
+        for bundle in self.client.get_bundles_iter(parent=item):
+            if bundle.name == "ORIGINAL":
+                self.client.delete_dso(bundle)
+                logger.info("Bundle '%s' deleted from DSpace", bundle.uuid)
+
+        # recreate 'ORIGINAL' bundle with new bitstreams
+        bundle = self._create_bundle_dspace8(item=item)
+        for bitstream_uri in self.files or []:
+            self._create_bitstream_dspace8(item, bitstream_uri)
 
     def result_error_message(
         self, message: str, dspace_response: str | None = None
