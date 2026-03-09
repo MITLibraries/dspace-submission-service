@@ -414,6 +414,9 @@ class Submission:
         item.metadata = updated_metadata
         self.client.update_item(item)
 
+        # ALTERNATIVE: If only adding bitstream replacement date:
+        # self.client.add_metadata(item=item, field="replacement.date", value="the date")
+
     def _update_bitstreams(self, item: DSpace8Item) -> DSpace8Bundle:
         """Update bitstreams for an item in DSpace.
 
