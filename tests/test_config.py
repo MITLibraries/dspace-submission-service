@@ -1,5 +1,5 @@
-# ruff: noqa: S105, PLR2004
-
+# ruff: noqa: SIM300
+import json
 import os
 
 import pytest
@@ -16,10 +16,35 @@ def test_config_without_workspace_env_raises_error():
 def test_config_from_env_success():
     os.environ["WORKSPACE"] = "stage"
     config = Config()
-    assert config.DSPACE_API_URL == "mock://dspace.edu/rest/"
-    assert config.DSPACE_USER == "test"
-    assert config.DSPACE_PASSWORD == "test"
-    assert config.DSPACE_TIMEOUT == 3.0
+    assert config.DSPACE_CREDENTIALS == json.dumps(
+        [
+            {
+                "sys": "ir-6",
+                "url": "mock://dspace.edu/rest",
+                "user": "test",
+                "password": "test",
+            },
+            {
+                "sys": "ddc-6",
+                "url": "mock://dspace.edu/rest",
+                "user": "test",
+                "password": "test",
+            },
+            {
+                "sys": "ir-8",
+                "url": "mock://dspace.edu/server/api",
+                "user": "test",
+                "password": "test",
+            },
+            {
+                "sys": "ddc-8",
+                "url": "mock://dspace.edu/server/api",
+                "user": "test",
+                "password": "test",
+            },
+        ]
+    )
+    assert config.DSPACE_TIMEOUT == 3.0  # noqa: PLR2004
     assert config.INPUT_QUEUE == "input_queue"
     assert config.LOG_FILTER == "false"
     assert config.LOG_LEVEL == "INFO"

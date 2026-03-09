@@ -73,9 +73,12 @@ class Submission:
             self.client = self.get_dspace_client()
 
         try:
-            if self.destination == "DSpace@MIT":  # Update after DSpace 8 migration
+            if self.destination in [
+                "DSpace@MIT",
+                "DDC-6",
+            ]:  # Update after DSpace 8 migration
                 item = self._submit_item_dspace6()
-            elif self.destination in ["DSpace8Local", "DSpace8MIT"]:
+            elif self.destination in ["IR-8", "DDC-8"]:
                 item = self._submit_item_dspace8()
             self.result_success_message(item)
 
@@ -124,9 +127,9 @@ class Submission:
             credentials = CONFIG.dspace_credentials[destination]
         except KeyError as exc:
             raise errors.InvalidDSpaceDestinationError(destination) from exc
-        if destination == "DSpace@MIT":  # Update after DSpace 8 migration
+        if destination in ["DSpace@MIT", "DDC-6"]:  # Update after DSpace 8 migration
             return self._create_dspace6_client(credentials)
-        elif destination in ["DSpace8Local", "DSpace8MIT"]:  # noqa: RET505
+        elif destination in ["IR-8", "DDC-8"]:  # noqa: RET505
             return self._create_dspace8_client(credentials)
         raise ValueError(f"Destination value not recognized: {destination}")
 
@@ -134,7 +137,7 @@ class Submission:
         self, credentials: dict[str, str | float | None]
     ) -> DSpace6Client:
         """Create and authenticate a DSpace 6 client."""
-        client = DSpace6Client(credentials["url"], timeout=credentials["timeout"])
+        client = DSpace6Client(credentials["url"], timeout=CONFIG.DSPACE_TIMEOUT)
         client.login(credentials["user"], credentials["password"])
         return client
 
