@@ -356,9 +356,9 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
 
 
 def test_submit_item_dspace8_success(dspace8_submission_instance):
-    item = dspace8_submission_instance._submit_item_dspace8()
+    item, bundle = dspace8_submission_instance._submit_item_dspace8()
     assert item.uuid == "item01"
-    assert item.bundle.uuid == "bundle01"
+    assert bundle.uuid == "bundle01"
 
 
 @patch("submitter.submission.DSpace8Client.create_item")
