@@ -17,32 +17,28 @@ def test_config_from_env_success():
     os.environ["WORKSPACE"] = "stage"
     config = Config()
     assert config.DSPACE_CREDENTIALS == json.dumps(
-        [
-            {
-                "sys": "ir-6",
+        {
+            "ir-6": {
                 "url": "mock://dspace.edu/rest",
                 "user": "test",
                 "password": "test",
             },
-            {
-                "sys": "ddc-6",
+            "ddc-6": {
                 "url": "mock://dspace.edu/rest",
                 "user": "test",
                 "password": "test",
             },
-            {
-                "sys": "ir-8",
+            "ir-8": {
                 "url": "mock://dspace.edu/server/api",
                 "user": "test",
                 "password": "test",
             },
-            {
-                "sys": "ddc-8",
+            "ddc-8": {
                 "url": "mock://dspace.edu/server/api",
                 "user": "test",
                 "password": "test",
             },
-        ]
+        }
     )
     assert config.DSPACE_TIMEOUT == 3.0  # noqa: PLR2004
     assert config.INPUT_QUEUE == "input_queue"

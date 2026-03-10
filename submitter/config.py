@@ -33,32 +33,28 @@ class Config:
         # if testing environment, override
         if env == "test":
             self.DSPACE_CREDENTIALS = json.dumps(
-                [
-                    {
-                        "sys": "ir-6",
+                {
+                    "ir-6": {
                         "url": "mock://dspace.edu/rest",
                         "user": "test",
                         "password": "test",
                     },
-                    {
-                        "sys": "ddc-6",
+                    "ddc-6": {
                         "url": "mock://dspace.edu/rest",
                         "user": "test",
                         "password": "test",
                     },
-                    {
-                        "sys": "ir-8",
+                    "ir-8": {
                         "url": "mock://dspace.edu/server/api",
                         "user": "test",
                         "password": "test",
                     },
-                    {
-                        "sys": "ddc-8",
+                    "ddc-8": {
                         "url": "mock://dspace.edu/server/api",
                         "user": "test",
                         "password": "test",
                     },
-                ]
+                }
             )
             self.DSPACE_TIMEOUT = 3.0
             self.INPUT_QUEUE = "input_queue"
@@ -72,11 +68,10 @@ class Config:
     @property
     def dspace_credentials(self) -> dict[str, dict[str, str | float | None]]:
         """Return DSpace credentials for supported instances."""
-        credentials_list = json.loads(self.DSPACE_CREDENTIALS)
-        credentials_dict = {cred["sys"]: cred for cred in credentials_list}
+        credentials = json.loads(self.DSPACE_CREDENTIALS)
         return {
-            "DSpace@MIT": credentials_dict["ir-6"],
-            "IR-8": credentials_dict["ir-8"],
-            "DDC-6": credentials_dict["ddc-6"],
-            "DDC-8": credentials_dict["ddc-8"],
+            "DSpace@MIT": credentials["ir-6"],
+            "IR-8": credentials["ir-8"],
+            "DDC-6": credentials["ddc-6"],
+            "DDC-8": credentials["ddc-8"],
         }
