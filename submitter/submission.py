@@ -78,9 +78,10 @@ class Submission:
                 "DDC-6",
             ]:  # Update after DSpace 8 migration
                 item = self._submit_item_dspace6()
+                self.result_success_message(item)
             elif self.destination in ["IR-8", "DDC-8"]:
-                item = self._submit_item_dspace8()
-            self.result_success_message(item)
+                item, bundle = self._submit_item_dspace8()
+                self.result_success_message(item, bundle)
 
         # Expected exception, generate error message and continue
         except (
@@ -304,13 +305,13 @@ class Submission:
                     e, bitstream.name, partial_item_handle
                 ) from e
 
-    def _submit_item_dspace8(self) -> DSpace8Item:
+    def _submit_item_dspace8(self) -> tuple[DSpace8Item, DSpace8Bundle]:
         """Submit item instance from submission message."""
         item = self._create_item_dspace8()
-        item.bundle = self._create_bundle_dspace8(item)
+        bundle = self._create_bundle_dspace8(item)
         for bitstream_uri in self.files or []:
-            self._create_bitstream_dspace8(item, bitstream_uri)
-        return item
+            self._create_bitstream_dspace8(item, bundle, bitstream_uri)
+        return item, bundle
 
     def _create_item_dspace8(self) -> DSpace8Item:
         """Create item in DSpace from submission message."""
@@ -346,11 +347,13 @@ class Submission:
         logger.info(f"Bundle created with UUID: {bundle.uuid}")
         return bundle
 
-    def _create_bitstream_dspace8(self, item: DSpace8Item, bitstream_data: dict) -> None:
+    def _create_bitstream_dspace8(
+        self, item: DSpace8Item, bundle: DSpace8Bundle, bitstream_data: dict
+    ) -> None:
         """Create bitstream for a specified item bundle."""
         try:
             bitstream = self.client.create_bitstream(
-                bundle=item.bundle,
+                bundle=bundle,
                 name=os.path.basename(bitstream_data["BitstreamName"]),
                 path=bitstream_data["FileLocation"],
             )
@@ -376,7 +379,9 @@ class Submission:
             "ExceptionTraceback": prettify(tb),
         }
 
-    def result_success_message(self, item: DSpace6Item | DSpace8Item) -> None:
+    def result_success_message(
+        self, item: DSpace6Item | DSpace8Item, bundle: DSpace8Bundle | None = None
+    ) -> None:
         """Set result message on Submission object on successful submit."""
         self.result_message = {
             "ResultType": "success",
@@ -387,7 +392,7 @@ class Submission:
         if isinstance(item, DSpace6Item):  # Update after DSpace 8 migration
             bitstreams = item.bitstreams
         elif isinstance(item, DSpace8Item):
-            bitstreams = self.client.get_bitstreams(bundle=item.bundle)
+            bitstreams = self.client.get_bitstreams(bundle=bundle)
         else:
             raise TypeError(
                 "Item is neither a 'DSpace6Item' or a 'DSpace8Item'."  # noqa: EM101
