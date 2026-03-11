@@ -75,28 +75,54 @@ def test_cli_start(mocked_dspace6, mocked_sqs):
     assert len(out_messages) > 0
 
 
-def test_verify_dspace_connection_success(mocked_dspace6, caplog):
+def test_verify_connection_dspace6_success(mocked_dspace6, caplog):
     with caplog.at_level(logging.INFO):
         runner = CliRunner()
         result = runner.invoke(
             main,
             [
                 "verify-dspace-connection",
+                "--submission-system",
+                "DSpace@MIT",
             ],
         )
         assert result.exit_code == 0
         assert (
-            "Successfully authenticated to mock://dspace.edu/rest/ as test" in caplog.text
+            'Successfully authenticated to "mock://dspace.edu/rest" as "test"'
+            in caplog.text
         )
 
 
-def test_verify_dspace_connection_failed(mocked_dspace6_auth_failure, caplog):
+def test_verify_connection_dspace8_success(mocked_dspace8, caplog):
+    with caplog.at_level(logging.INFO):
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "verify-dspace-connection",
+                "--submission-system",
+                "IR-8",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (
+            'Successfully authenticated to "mock://dspace.edu/server/api" as "test"'
+            in caplog.text
+        )
+
+
+def test_verify_dspace_connection_failed(mocked_dspace8_auth_failure, caplog):
     runner = CliRunner()
     result = runner.invoke(
         main,
         [
             "verify-dspace-connection",
+            "--submission-system",
+            "IR-8",
         ],
     )
     assert result.exit_code == 0
-    assert "Failed to authenticate to mock://dspace.edu/rest/ as test" in caplog.text
+    assert (
+        'Failed to authenticate to "mock://dspace.edu/server/api" as "test"'
+        in caplog.text
+    )

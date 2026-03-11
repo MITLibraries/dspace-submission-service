@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -19,13 +20,8 @@ class Config:
 
     def load_config_variables(self, env: str) -> None:
         # default to using env vars with defaults
-        self.DSPACE_API_URL = os.getenv("DSPACE_API_URL")
-        self.DSPACE_USER = os.getenv("DSPACE_USER")
-        self.DSPACE_PASSWORD = os.getenv("DSPACE_PASSWORD")
-        self.DSPACE_TIMEOUT = float(os.getenv("DSPACE_TIMEOUT", "120.0"))
-        self.LOCAL_DSPACE_API_URL = os.getenv("LOCAL_DSPACE_API_URL")
-        self.LOCAL_DSPACE_USER = os.getenv("LOCAL_DSPACE_USER")
-        self.LOCAL_DSPACE_PASSWORD = os.getenv("LOCAL_DSPACE_PASSWORD")
+        self.DSPACE_CREDENTIALS = os.getenv("DSS_DSPACE_CREDENTIALS", "{}")
+        self.DSPACE_TIMEOUT = float(os.getenv("DSPACE_TIMEOUT", "180.0"))
         self.INPUT_QUEUE = os.getenv("INPUT_QUEUE")
         self.LOG_FILTER = os.getenv("LOG_FILTER", "true").lower()
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -36,14 +32,32 @@ class Config:
 
         # if testing environment, override
         if env == "test":
-            self.DSPACE_API_URL = "mock://dspace.edu/rest/"
-            self.DSPACE_USER = "test"
-            self.DSPACE_PASSWORD = "test"  # nosec # noqa: S105
+            self.DSPACE_CREDENTIALS = json.dumps(
+                {
+                    "ir-6": {
+                        "url": "mock://dspace.edu/rest",
+                        "user": "test",
+                        "password": "test",
+                    },
+                    "ddc-6": {
+                        "url": "mock://dspace.edu/rest",
+                        "user": "test",
+                        "password": "test",
+                    },
+                    "ir-8": {
+                        "url": "mock://dspace.edu/server/api",
+                        "user": "test",
+                        "password": "test",
+                    },
+                    "ddc-8": {
+                        "url": "mock://dspace.edu/server/api",
+                        "user": "test",
+                        "password": "test",
+                    },
+                }
+            )
             self.DSPACE_TIMEOUT = 3.0
-            self.LOCAL_DSPACE_API_URL = "mock://dspace.edu/server/api"
-            self.LOCAL_DSPACE_USER = "local_test"
-            self.LOCAL_DSPACE_PASSWORD = "local_test"  # nosec # noqa: S105
-            self.INPUT_QUEUE = "test_queue_with_messages"
+            self.INPUT_QUEUE = "input_queue"
             self.LOG_FILTER = "true"
             self.LOG_LEVEL = "INFO"
             self.SENTRY_DSN = None
@@ -53,18 +67,11 @@ class Config:
 
     @property
     def dspace_credentials(self) -> dict[str, dict[str, str | float | None]]:
-        """Return DSpace credentials for supportedinstances."""
+        """Return DSpace credentials for supported instances."""
+        credentials = json.loads(self.DSPACE_CREDENTIALS)
         return {
-            "DSpace@MIT": {
-                "url": self.DSPACE_API_URL,
-                "user": self.DSPACE_USER,
-                "password": self.DSPACE_PASSWORD,
-                "timeout": self.DSPACE_TIMEOUT,
-            },
-            "DSpace8Local": {
-                "url": self.LOCAL_DSPACE_API_URL,
-                "user": self.LOCAL_DSPACE_USER,
-                "password": self.LOCAL_DSPACE_PASSWORD,
-                "timeout": self.DSPACE_TIMEOUT,
-            },
+            "DSpace@MIT": credentials["ir-6"],
+            "IR-8": credentials["ir-8"],
+            "DDC-6": credentials["ddc-6"],
+            "DDC-8": credentials["ddc-8"],
         }

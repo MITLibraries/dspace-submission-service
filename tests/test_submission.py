@@ -29,7 +29,7 @@ def test_submission_get_dspace_client_dspace6_success(mocked_dspace6):
 
 def test_submission_get_dspace_client_dspace8_success(mocked_dspace8):
     submission = Submission(
-        destination="DSpace8Local",
+        destination="IR-8",
         attributes=None,
         result_queue=None,
     )
@@ -41,7 +41,7 @@ def test_submission_get_dspace_client_dspace8_no_auth_raises_error(
     mocked_dspace8_auth_failure,
 ):
     submission = Submission(
-        destination="DSpace8Local",
+        destination="IR-8",
         attributes=None,
         result_queue=None,
     )

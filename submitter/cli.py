@@ -1,15 +1,15 @@
 import logging
 
 import click
-from dspace.client import DSpaceClient as DSpace6Client
-from requests.exceptions import HTTPError
 
 from submitter import CONFIG
+from submitter.errors import DSpaceAuthenticationError
 from submitter.message import (
     generate_result_messages_from_file,
     generate_submission_messages_from_file,
 )
 from submitter.sqs import create, message_loop, write_message_to_queue
+from submitter.submission import Submission
 
 logger = logging.getLogger(__name__)
 
@@ -92,19 +92,29 @@ def create_queue(name: str) -> None:
 
 
 @main.command()
-def verify_dspace_connection() -> None:
-    client = DSpace6Client(CONFIG.DSPACE_API_URL, timeout=CONFIG.DSPACE_TIMEOUT)
+@click.option(
+    "--submission-system",
+    required=True,
+    help="Name of submission system to verify connection to",
+)
+def verify_dspace_connection(
+    submission_system: str,
+) -> None:
+    submission = Submission(
+        destination=submission_system,
+        attributes={},
+        result_queue="non_existent_queue",
+    )
+    credentials = CONFIG.dspace_credentials[submission_system]
     try:
-        client.login(CONFIG.DSPACE_USER, CONFIG.DSPACE_PASSWORD)
-    except HTTPError:
+        submission.get_dspace_client()
+    except DSpaceAuthenticationError:
         logger.exception(
-            "Failed to authenticate to %s as %s",
-            CONFIG.DSPACE_API_URL,
-            CONFIG.DSPACE_USER,
+            f'Failed to authenticate to "{credentials["url"]}" as '
+            f'"{credentials["user"]}"',
         )
     else:
         logger.info(
-            "Successfully authenticated to %s as %s",
-            CONFIG.DSPACE_API_URL,
-            CONFIG.DSPACE_USER,
+            f'Successfully authenticated to "{credentials["url"]}" as '
+            f'"{credentials["user"]}"',
         )

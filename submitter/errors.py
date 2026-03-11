@@ -225,8 +225,8 @@ class DSpaceAuthenticationError(Exception):
     ):
         self.message = (
             f"Failed to authenticate to DSpace server at '{dspace_url}' with user "
-            f"'{dspace_user}'. Please verify that the DSPACE_USER and DSPACE_PASSWORD "
-            "environment variables are set correctly and that the DSpace server is "
+            f"'{dspace_user}'. Please verify that the DSS_DSPACE_CREDENTIALS "
+            "environment variable is set correctly and that the DSpace server is "
             "accessible."
         )
 

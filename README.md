@@ -22,10 +22,7 @@ will be helpful to understand how to create and run commands.
 
 Set env variables in `.env` file as needed:
 - WORKSPACE: required, "dev" is a good value for local development
-- DSPACE_API_URL: only needed if publishing to DSpace, use DSpace test instance for
-  development
-- DSPACE_USER: only needed if publishing to DSpace
-- DSPACE_PASSWORD: only needed if publishing to DSpace
+- DSS_DSPACE_CREDENTIALS: An array containing credentials for all supported DSpace instances
 - DSPACE_TIMEOUT: only needed if publishing to DSpace, defaults to 120 seconds
 - INPUT_QUEUE: input message queue to use for development (see section below on
   using Moto for local SQS queues)

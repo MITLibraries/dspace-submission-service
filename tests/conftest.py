@@ -217,7 +217,7 @@ def test_dspace8_client(mocked_dspace8):
 @pytest.fixture
 def dspace8_submission_instance(test_dspace8_client):
     submission = Submission(
-        destination="DSpace8Local",
+        destination="IR-8",
         collection_handle="0000/collection01",
         metadata_location="tests/fixtures/test-item-metadata.json",
         files=[
@@ -499,9 +499,33 @@ def raw_body():
 @pytest.fixture(autouse=True)
 def test_env(monkeypatch):
     monkeypatch.setenv("WORKSPACE", "test")
-    monkeypatch.setenv("DSPACE_API_URL", "mock://dspace.edu/rest/")
-    monkeypatch.setenv("DSPACE_USER", "test")
-    monkeypatch.setenv("DSPACE_PASSWORD", "test")
+    monkeypatch.setenv(
+        "DSS_DSPACE_CREDENTIALS",
+        json.dumps(
+            {
+                "ir-6": {
+                    "url": "mock://dspace.edu/rest",
+                    "user": "test",
+                    "password": "test",
+                },
+                "ddc-6": {
+                    "url": "mock://dspace.edu/rest",
+                    "user": "test",
+                    "password": "test",
+                },
+                "ir-8": {
+                    "url": "mock://dspace.edu/server/api",
+                    "user": "test",
+                    "password": "test",
+                },
+                "ddc-8": {
+                    "url": "mock://dspace.edu/server/api",
+                    "user": "test",
+                    "password": "test",
+                },
+            }
+        ),
+    )
     monkeypatch.setenv("DSPACE_TIMEOUT", "3.0")
     monkeypatch.setenv("INPUT_QUEUE", "input_queue")
     monkeypatch.setenv("LOG_FILTER", "false")
