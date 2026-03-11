@@ -198,9 +198,9 @@ def test_result_success_message_dspace8(mock_get_bitstreams, dspace8_submission_
             "lastModified": "yesterday",
         }
     )
-    item.bundle = DSpace8Bundle({"uuid": "bundle01"})
+    bundle = DSpace8Bundle({"uuid": "bundle01"})
 
-    dspace8_submission_instance.result_success_message(item)
+    dspace8_submission_instance.result_success_message(item, bundle)
     assert dspace8_submission_instance.result_message["ResultType"] == "success"
     assert dspace8_submission_instance.result_message["ItemHandle"] == item.handle
     assert dspace8_submission_instance.result_message["lastModified"] == item.lastModified
@@ -356,9 +356,9 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
 
 
 def test_submit_item_dspace8_success(dspace8_submission_instance):
-    item = dspace8_submission_instance._submit_item_dspace8()
+    item, bundle = dspace8_submission_instance._submit_item_dspace8()
     assert item.uuid == "item01"
-    assert item.bundle.uuid == "bundle01"
+    assert bundle.uuid == "bundle01"
 
 
 @patch("submitter.submission.DSpace8Client.create_item")
