@@ -14,19 +14,19 @@ from freezegun import freeze_time
 from requests.exceptions import RequestException
 
 from submitter import errors
-from submitter.submission import Submission, prettify
+from submitter.submission import Submission, dspace_clients, prettify
 
 
 def test_dspace_client_cache_stores_by_destination(
     mocked_dspace, input_message_good_dspace6, input_message_good_dspace8
 ):
-    assert Submission._dspace_clients == {}
+    assert dspace_clients == {}
     submission_dspace6 = Submission.from_message(input_message_good_dspace6)
     submission_dspace6.submit()
-    assert Submission._dspace_clients == {"DSpace@MIT": submission_dspace6.client}
+    assert dspace_clients == {"DSpace@MIT": submission_dspace6.client}
     submission_dspace8 = Submission.from_message(input_message_good_dspace8)
     submission_dspace8.submit()
-    assert Submission._dspace_clients == {
+    assert dspace_clients == {
         "DSpace@MIT": submission_dspace6.client,
         "IR-8": submission_dspace8.client,
     }

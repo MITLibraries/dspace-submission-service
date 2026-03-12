@@ -11,7 +11,7 @@ from dspace_rest_client.client import DSpaceClient as DSpace8Client
 from moto import mock_aws
 from requests import exceptions
 
-from submitter.submission import Submission
+from submitter.submission import Submission, dspace_clients
 
 
 @pytest.fixture
@@ -264,8 +264,8 @@ def test_dspace8_client(mocked_dspace):
 
 @pytest.fixture(autouse=True)
 def clear_dspace_client_cache():
-    """Clear the Submission class's shared DSpace client cache before each test."""
-    Submission._dspace_clients.clear()  # noqa: SLF001
+    """Clear the DSpace client cache before each test."""
+    dspace_clients.clear()
 
 
 @pytest.fixture

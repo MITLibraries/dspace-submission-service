@@ -29,12 +29,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Shared cache for DSpace clients across all Submission instances
+dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
+    {}
+)  # Update after DSpace 8 migration
+
 
 class Submission:
-    # Shared cache for DSpace clients across all Submission instances
-    _dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
-        {}  # noqa: RUF012
-    )  # Update after DSpace 8 migration
 
     def __init__(
         self,
@@ -73,9 +74,7 @@ class Submission:
         """
         if CONFIG.SKIP_PROCESSING != "true":
             self.client = self.get_dspace_client()
-            logger.debug(
-                "Current clients in cache: %s", list(self._dspace_clients.keys())
-            )
+            logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
         try:
             if self.destination in [
@@ -119,14 +118,14 @@ class Submission:
         if not self.destination:
             raise errors.InvalidDSpaceDestinationError(self.destination)
         logger.debug(f"Getting DSpace client for destination '{self.destination}'")
-        if self.destination not in self._dspace_clients:
+        if self.destination not in dspace_clients:
             client = self._create_dspace_client(self.destination)
-            self._dspace_clients[self.destination] = client
+            dspace_clients[self.destination] = client
         else:
             logger.debug(
                 f"Using cached DSpace client for destination '{self.destination}'"
             )
-        return self._dspace_clients[self.destination]
+        return dspace_clients[self.destination]
 
     def _create_dspace_client(
         self, destination: str
