@@ -11,7 +11,7 @@ from dspace_rest_client.client import DSpaceClient as DSpace8Client
 from moto import mock_aws
 from requests import exceptions
 
-from submitter.submission import Submission
+from submitter.submission import Submission, dspace_clients
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def test_aws_user(aws_credentials):
 
 
 @pytest.fixture
-def mocked_dspace6():
+def mocked_dspace():
     """The following mock responses from DSpace based on the URL of the request.
 
     Fixtures below that prepare an SQS message, where specific collections or bitstreams
@@ -66,7 +66,8 @@ def mocked_dspace6():
     "CollectionHandle: 0000/collection03".  This aligns with a URL defined here, and will
     therefore throw a requests.exceptions.ConnectTimeout exception to test against.
     """
-    with requests_mock.Mocker() as m:
+    with requests_mock.Mocker() as m:  # Update after DSpace 8 migration
+        # DSpace 6 URLs
         m.post(
             "mock://dspace.edu/rest/login",
             cookies={"JSESSIONID": "sessioncookie"},
@@ -112,12 +113,7 @@ def mocked_dspace6():
         m.delete("mock://dspace.edu/rest/bitstreams/bitstream01", status_code=200)
         m.delete("mock://dspace.edu/rest/items/item01", status_code=200)
         m.delete("mock://dspace.edu/rest/items/item02", status_code=200)
-        yield m
-
-
-@pytest.fixture
-def mocked_dspace8():
-    with requests_mock.Mocker() as m:
+        # DSpace 8 URLs
         m.post("mock://dspace.edu/server/api/authn/login")
         m.get("mock://dspace.edu/server/api/authn/status", json={"authenticated": True})
         m.get("mock://dspace.edu/server/api/pid/find", json={"uuid": "collection01"})
@@ -128,11 +124,63 @@ def mocked_dspace8():
         m.delete("mock://dspace.edu/server/api/core/items/item01", status_code=200)
         m.post(
             "mock://dspace.edu/server/api/core/items/item01/bundles",
-            json={"uuid": "bundle01"},
+            json={
+                "uuid": "bundle01",
+                "name": "ORIGINAL",
+                "_links": {
+                    "self": {
+                        "href": "mock://dspace.edu/server/api/core/bundles/bundle01"
+                    },
+                    "bitstreams": {
+                        "href": "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams"
+                    },
+                },
+            },
+        )
+        m.get(
+            "mock://dspace.edu/server/api/core/bundles/bundle01",
+            json={
+                "uuid": "bundle01",
+                "name": "ORIGINAL",
+                "_links": {
+                    "self": {
+                        "href": "mock://dspace.edu/server/api/core/bundles/bundle01"
+                    },
+                    "bitstreams": {
+                        "href": "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams"
+                    },
+                },
+            },
         )
         m.post(
             "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams",
-            json={"uuid": "bitstream01"},
+            json={
+                "uuid": "bitstream01",
+                "name": "test-file-01.pdf",
+                "checkSum": "62778292a3a6dccbe2662a2bfca3b86e",
+                "checkSumAlgorithm": "MD5",
+            },
+        )
+        m.get(
+            "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams",
+            json={
+                "_embedded": {
+                    "bitstreams": [
+                        {
+                            "uuid": "bitstream01",
+                            "name": "test-file-01.pdf",
+                            "checkSum": "62778292a3a6dccbe2662a2bfca3b86e",
+                            "checkSumAlgorithm": "MD5",
+                        }
+                    ]
+                },
+                "page": {
+                    "size": 20,
+                    "totalElements": 1,
+                    "totalPages": 1,
+                    "number": 0,
+                },
+            },
         )
         yield m
 
@@ -196,14 +244,14 @@ def mocked_s3(aws_credentials):
 
 
 @pytest.fixture
-def test_dspace6_client(mocked_dspace6):
+def test_dspace6_client(mocked_dspace):
     client = DSpace6Client("mock://dspace.edu/rest/")
     client.login("test", "test")
     return client
 
 
 @pytest.fixture
-def test_dspace8_client(mocked_dspace8):
+def test_dspace8_client(mocked_dspace):
     client = DSpace8Client(
         api_endpoint="mock://dspace.edu/server/api",
         username="test",
@@ -212,6 +260,12 @@ def test_dspace8_client(mocked_dspace8):
     )
     client.authenticate()
     return client
+
+
+@pytest.fixture(autouse=True)
+def clear_dspace_client_cache():
+    """Clear the DSpace client cache before each test."""
+    dspace_clients.clear()
 
 
 @pytest.fixture
@@ -240,13 +294,36 @@ def dspace8_submission_instance(test_dspace8_client):
 
 
 @pytest.fixture
-def input_message_good(mocked_sqs):
+def input_message_good_dspace6(mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
     queue.send_message(
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
                 "SubmissionSystem": "DSpace@MIT",
+                "CollectionHandle": "0000/collection01",
+                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
+                "Files": [
+                    {
+                        "BitstreamName": "test-file-01.pdf",
+                        "FileLocation": "tests/fixtures/test-file-01.pdf",
+                        "BitstreamDescription": "A test bitstream",
+                    }
+                ],
+            }
+        ),
+    )
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
+
+
+@pytest.fixture
+def input_message_good_dspace8(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
+    queue.send_message(
+        MessageAttributes=test_attributes,
+        MessageBody=json.dumps(
+            {
+                "SubmissionSystem": "IR-8",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [

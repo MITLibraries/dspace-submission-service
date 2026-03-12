@@ -29,8 +29,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Shared cache for DSpace clients across all Submission instances
+dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
+    {}
+)  # Update after DSpace 8 migration
+
 
 class Submission:
+
     def __init__(
         self,
         attributes: dict,
@@ -49,9 +55,6 @@ class Submission:
         self.result_attributes = attributes
         self.result_message = result_message
         self.result_queue = result_queue
-        self._dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
-            {}
-        )  # Update after DSpace 8 migration
 
     def submit(self) -> None:
         """Submit a submission to DSpace as a new item with associated bitstreams.
@@ -71,6 +74,7 @@ class Submission:
         """
         if CONFIG.SKIP_PROCESSING != "true":
             self.client = self.get_dspace_client()
+            logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
         try:
             if self.destination in [
@@ -114,16 +118,20 @@ class Submission:
         if not self.destination:
             raise errors.InvalidDSpaceDestinationError(self.destination)
         logger.debug(f"Getting DSpace client for destination '{self.destination}'")
-        if self.destination not in self._dspace_clients:
+        if self.destination not in dspace_clients:
             client = self._create_dspace_client(self.destination)
-            self._dspace_clients[self.destination] = client
-        return self._dspace_clients[self.destination]
+            dspace_clients[self.destination] = client
+        else:
+            logger.debug(
+                f"Using cached DSpace client for destination '{self.destination}'"
+            )
+        return dspace_clients[self.destination]
 
     def _create_dspace_client(
         self, destination: str
     ) -> DSpace6Client | DSpace8Client:  # Update after DSpace 8 migration
         """Create a DSpace client for the submission destination."""
-        logger.debug(f"Using {destination} instance for submission")
+        logger.debug(f"Creating DSpace client for destination '{destination}'")
         try:
             credentials = CONFIG.dspace_credentials[destination]
         except KeyError as exc:
@@ -140,6 +148,10 @@ class Submission:
         """Create and authenticate a DSpace 6 client."""
         client = DSpace6Client(credentials["url"], timeout=CONFIG.DSPACE_TIMEOUT)
         client.login(credentials["user"], credentials["password"])
+        logger.info(
+            f'Successfully authenticated to "{credentials["url"]}" as '
+            f'"{credentials["user"]}"'
+        )
         return client
 
     def _create_dspace8_client(
@@ -157,6 +169,10 @@ class Submission:
             raise errors.DSpaceAuthenticationError(
                 credentials["url"], credentials["user"]
             )
+        logger.info(
+            f'Successfully authenticated to "{credentials["url"]}" as '
+            f'"{credentials["user"]}"'
+        )
         return client
 
     @classmethod

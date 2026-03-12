@@ -14,10 +14,25 @@ from freezegun import freeze_time
 from requests.exceptions import RequestException
 
 from submitter import errors
-from submitter.submission import Submission, prettify
+from submitter.submission import Submission, dspace_clients, prettify
 
 
-def test_submission_get_dspace_client_dspace6_success(mocked_dspace6):
+def test_dspace_client_cache_stores_by_destination(
+    mocked_dspace, input_message_good_dspace6, input_message_good_dspace8
+):
+    assert dspace_clients == {}
+    submission_dspace6 = Submission.from_message(input_message_good_dspace6)
+    submission_dspace6.submit()
+    assert dspace_clients == {"DSpace@MIT": submission_dspace6.client}
+    submission_dspace8 = Submission.from_message(input_message_good_dspace8)
+    submission_dspace8.submit()
+    assert dspace_clients == {
+        "DSpace@MIT": submission_dspace6.client,
+        "IR-8": submission_dspace8.client,
+    }
+
+
+def test_submission_get_dspace_client_dspace6_success(mocked_dspace):
     submission = Submission(
         destination="DSpace@MIT",
         attributes=None,
@@ -27,7 +42,7 @@ def test_submission_get_dspace_client_dspace6_success(mocked_dspace6):
     assert isinstance(dspace_client, DSpace6Client)
 
 
-def test_submission_get_dspace_client_dspace8_success(mocked_dspace8):
+def test_submission_get_dspace_client_dspace8_success(mocked_dspace):
     submission = Submission(
         destination="IR-8",
         attributes=None,
@@ -69,8 +84,10 @@ def test_submission_get_dspace_client_no_destination_raises_error():
         submission.get_dspace_client()
 
 
-def test_submission_from_message_dspace6_success(input_message_good, mocked_dspace6):
-    submission = Submission.from_message(input_message_good)
+def test_submission_from_message_dspace6_success(
+    input_message_good_dspace6, mocked_dspace
+):
+    submission = Submission.from_message(input_message_good_dspace6)
     assert submission.destination == "DSpace@MIT"
     assert submission.collection_handle == "0000/collection01"
     assert submission.metadata_location == "tests/fixtures/test-item-metadata.json"
@@ -90,7 +107,7 @@ def test_submission_from_message_dspace6_success(input_message_good, mocked_dspa
 
 
 def test_submission_from_message_dspace6_creates_error_message(
-    input_message_nonconforming_body, mocked_dspace6
+    input_message_nonconforming_body, mocked_dspace
 ):
     submission = Submission.from_message(input_message_nonconforming_body)
     assert submission.result_message == (
@@ -100,7 +117,7 @@ def test_submission_from_message_dspace6_creates_error_message(
 
 
 def test_submission_from_message_dspace6_raises_invalid_queue_error(
-    input_message_invalid_queue, mocked_dspace6
+    input_message_invalid_queue, mocked_dspace
 ):
     with pytest.raises(errors.SubmitMessageInvalidResultQueueError):
         Submission.from_message(input_message_invalid_queue)
@@ -113,7 +130,7 @@ def test_submission_from_message_raises_missing_attribute_error(
         Submission.from_message(input_message_missing_attribute)
 
 
-def test_get_metadata_entries_from_file_dspace6(mocked_dspace6):
+def test_get_metadata_entries_from_file_dspace6(mocked_dspace):
     submission = Submission(
         destination="DSpace@MIT",
         collection_handle=None,
@@ -127,8 +144,8 @@ def test_get_metadata_entries_from_file_dspace6(mocked_dspace6):
 
 
 @freeze_time("2021-09-01 05:06:07")
-def test_result_error_message_dspace6(input_message_good, mocked_dspace6):
-    submission = Submission.from_message(input_message_good)
+def test_result_error_message_dspace6(input_message_good_dspace6, mocked_dspace):
+    submission = Submission.from_message(input_message_good_dspace6)
     submission.result_error_message("A test error")
     assert submission.result_message["ResultType"] == "error"
     assert submission.result_message["ErrorTimestamp"] == "2021-09-01 05:06:07"
@@ -140,7 +157,7 @@ def test_result_error_message_dspace6(input_message_good, mocked_dspace6):
 
 
 @freeze_time("2021-09-01 05:06:07")
-def test_result_error_message_dspace8(input_message_item_create_error, mocked_dspace8):
+def test_result_error_message_dspace8(input_message_item_create_error, mocked_dspace):
     submission = Submission.from_message(input_message_item_create_error)
     submission.result_error_message(
         "A test error", dspace_response="A test DSpace response"
@@ -154,7 +171,7 @@ def test_result_error_message_dspace8(input_message_item_create_error, mocked_ds
     )
 
 
-def test_result_success_message_dspace6(input_message_good, mocked_dspace6):
+def test_result_success_message_dspace6(input_message_good_dspace6, mocked_dspace):
     item = Item()
     item.handle = "0000/12345"
     item.lastModified = "yesterday"
@@ -166,7 +183,7 @@ def test_result_success_message_dspace6(input_message_good, mocked_dspace6):
         "checkSumAlgorithm": "MD5",
     }
     item.bitstreams = [bitstream]
-    submission = Submission.from_message(input_message_good)
+    submission = Submission.from_message(input_message_good_dspace6)
     submission.result_success_message(item)
     assert submission.result_message["ResultType"] == "success"
     assert submission.result_message["ItemHandle"] == item.handle
@@ -215,10 +232,13 @@ def test_result_success_message_dspace8(mock_get_bitstreams, dspace8_submission_
 
 @patch("submitter.submission.DSpace6Client")
 def test_submit_dspace6_success(
-    mock_dspace_client, test_dspace6_client, mocked_dspace6, input_message_good
+    mock_dspace_client,
+    test_dspace6_client,
+    mocked_dspace,
+    input_message_good_dspace6,
 ):
     mock_dspace_client.return_value = test_dspace6_client
-    submission = Submission.from_message(input_message_good)
+    submission = Submission.from_message(input_message_good_dspace6)
     submission.submit()
     assert submission.result_message["ResultType"] == "success"
 
@@ -236,7 +256,7 @@ def test_submit_dspace8_success(mock_get_bitstreams, dspace8_submission_instance
 def test_submit_dspace6_item_create_error(
     mock_dspace_client,
     test_dspace6_client,
-    mocked_dspace6,
+    mocked_dspace,
     input_message_item_create_error,
 ):
     mock_dspace_client.return_value = test_dspace6_client
@@ -254,7 +274,7 @@ def test_submit_dspace6_item_create_error(
 def test_submit_dspace6_add_bitstreams_error(
     mock_dspace_client,
     test_dspace6_client,
-    mocked_dspace6,
+    mocked_dspace,
     input_message_bitstream_create_error,
 ):
     mock_dspace_client.return_value = test_dspace6_client
@@ -270,7 +290,7 @@ def test_submit_dspace6_add_bitstreams_error(
 
 @patch("submitter.submission.DSpace6Client")
 def test_submit_dspace6_item_post_error(
-    mock_dspace_client, test_dspace6_client, mocked_dspace6, input_message_item_post_error
+    mock_dspace_client, test_dspace6_client, mocked_dspace, input_message_item_post_error
 ):
     mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_item_post_error)
@@ -287,7 +307,7 @@ def test_submit_dspace6_item_post_error(
 def test_submit_dspace6_timeout_raises_error(
     mock_dspace_client,
     test_dspace6_client,
-    mocked_dspace6,
+    mocked_dspace,
     input_message_item_post_dspace_timeout,
 ):
     mock_dspace_client.return_value = test_dspace6_client
@@ -300,7 +320,7 @@ def test_submit_dspace6_timeout_raises_error(
 def test_submit_dspace6_bitstream_post_file_open_error(
     mock_dspace_client,
     test_dspace6_client,
-    mocked_dspace6,
+    mocked_dspace,
     input_message_bitstream_file_open_error,
 ):
     mock_dspace_client.return_value = test_dspace6_client
@@ -318,7 +338,7 @@ def test_submit_dspace6_bitstream_post_file_open_error(
 def test_submit_dspace6_bitstream_post_dspace_error(
     mock_dspace_client,
     test_dspace6_client,
-    mocked_dspace6,
+    mocked_dspace,
     input_message_bitstream_dspace_post_error,
 ):
     mock_dspace_client.return_value = test_dspace6_client
@@ -336,7 +356,7 @@ def test_submit_dspace6_dspace_unknown_api_error_logs_exception_and_raises_error
     mock_dspace_client,
     test_dspace6_client,
     caplog,
-    mocked_dspace6,
+    mocked_dspace,
     input_message_item_post_dspace_generic_500_error,
 ):
     mock_dspace_client.return_value = test_dspace6_client
@@ -383,7 +403,7 @@ def test_submit_item_dspace8_bundle_create_error_raises_exception(
 @patch("submitter.submission.DSpace8Client.create_bitstream")
 def test_submit_item_dspace8_bitstream_error_raises_exception(
     mock_create_bitstream,
-    mocked_dspace8,
+    mocked_dspace,
     dspace8_submission_instance,
     caplog,
 ):
@@ -396,7 +416,7 @@ def test_submit_item_dspace8_bitstream_error_raises_exception(
 
 @patch("submitter.submission.DSpace8Client.create_bitstream")
 def test_submit_item_dspace8_bitstream_error_triggers_cleanup(
-    mock_create_bitstream, mocked_dspace8, dspace8_submission_instance, caplog
+    mock_create_bitstream, mocked_dspace, dspace8_submission_instance, caplog
 ):
     bitstream = DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
     mock_create_bitstream.side_effect = [bitstream, RequestException]
