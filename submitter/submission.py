@@ -122,13 +122,17 @@ class Submission:
         if self.destination not in self._dspace_clients:
             client = self._create_dspace_client(self.destination)
             self._dspace_clients[self.destination] = client
+        else:
+            logger.debug(
+                f"Using cached DSpace client for destination '{self.destination}'"
+            )
         return self._dspace_clients[self.destination]
 
     def _create_dspace_client(
         self, destination: str
     ) -> DSpace6Client | DSpace8Client:  # Update after DSpace 8 migration
         """Create a DSpace client for the submission destination."""
-        logger.debug(f"Using {destination} instance for submission")
+        logger.debug(f"Creating DSpace client for destination '{destination}'")
         try:
             credentials = CONFIG.dspace_credentials[destination]
         except KeyError as exc:
