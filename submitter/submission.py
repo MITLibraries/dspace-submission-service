@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 
 
 class Submission:
+    # Shared cache for DSpace clients across all Submission instances
+    _dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
+        {}  # noqa: RUF012
+    )  # Update after DSpace 8 migration
+
     def __init__(
         self,
         attributes: dict,
@@ -49,9 +54,6 @@ class Submission:
         self.result_attributes = attributes
         self.result_message = result_message
         self.result_queue = result_queue
-        self._dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
-            {}
-        )  # Update after DSpace 8 migration
 
     def submit(self) -> None:
         """Submit a submission to DSpace as a new item with associated bitstreams.
@@ -71,6 +73,9 @@ class Submission:
         """
         if CONFIG.SKIP_PROCESSING != "true":
             self.client = self.get_dspace_client()
+            logger.debug(
+                "Current clients in cache: %s", list(self._dspace_clients.keys())
+            )
 
         try:
             if self.destination in [
@@ -140,6 +145,10 @@ class Submission:
         """Create and authenticate a DSpace 6 client."""
         client = DSpace6Client(credentials["url"], timeout=CONFIG.DSPACE_TIMEOUT)
         client.login(credentials["user"], credentials["password"])
+        logger.info(
+            f'Successfully authenticated to "{credentials["url"]}" as '
+            f'"{credentials["user"]}"'
+        )
         return client
 
     def _create_dspace8_client(
@@ -157,6 +166,10 @@ class Submission:
             raise errors.DSpaceAuthenticationError(
                 credentials["url"], credentials["user"]
             )
+        logger.info(
+            f'Successfully authenticated to "{credentials["url"]}" as '
+            f'"{credentials["user"]}"'
+        )
         return client
 
     @classmethod
