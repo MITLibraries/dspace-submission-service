@@ -22,12 +22,14 @@ from dspace_rest_client.models import (
 )  # Update after DSpace 8 migration
 from dspace_rest_client.models import Item as DSpace8Item
 
-from submitter import CONFIG, errors
+from submitter import errors
+from submitter.config import Config
 
 if TYPE_CHECKING:
     from mypy_boto3_sqs.service_resource import Message
 
 logger = logging.getLogger(__name__)
+CONFIG = Config()
 
 # Shared cache for DSpace clients across all Submission instances
 dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
@@ -72,7 +74,7 @@ class Submission:
                 it is re-raised with some useful message information and stops the
                 entire SQS message loop process until someone can investigate further.
         """
-        if CONFIG.SKIP_PROCESSING != "true":
+        if CONFIG.skip_processing != "true":
             self.client = self.get_dspace_client()
             logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
@@ -146,7 +148,7 @@ class Submission:
         self, credentials: dict[str, str | float | None]
     ) -> DSpace6Client:
         """Create and authenticate a DSpace 6 client."""
-        client = DSpace6Client(credentials["url"], timeout=CONFIG.DSPACE_TIMEOUT)
+        client = DSpace6Client(credentials["url"], timeout=CONFIG.dspace_timeout)
         client.login(credentials["user"], credentials["password"])
         logger.info(
             f'Successfully authenticated to "{credentials["url"]}" as '
@@ -190,7 +192,7 @@ class Submission:
         result_queue = message.message_attributes.get(  # type: ignore[call-overload]
             "OutputQueue", {}
         ).get("StringValue")
-        if not result_queue or result_queue not in CONFIG.OUTPUT_QUEUES:
+        if not result_queue or result_queue not in CONFIG.output_queues:
             raise errors.SubmitMessageInvalidResultQueueError(
                 message.message_id, result_queue
             )
@@ -410,9 +412,7 @@ class Submission:
         elif isinstance(item, DSpace8Item):
             bitstreams = self.client.get_bitstreams(bundle=bundle)
         else:
-            raise TypeError(
-                "Item is neither a 'DSpace6Item' or a 'DSpace8Item'."  # noqa: EM101
-            )
+            raise TypeError("Item is neither a 'DSpace6Item' or a 'DSpace8Item'.")
         for bitstream in bitstreams:
             self.result_message["Bitstreams"].append(
                 {

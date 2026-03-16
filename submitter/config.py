@@ -2,76 +2,136 @@ import json
 import logging
 import os
 
+import sentry_sdk
+
 logger = logging.getLogger(__name__)
 
 
 class Config:
-    def __init__(self) -> None:
+
+    REQUIRED_ENV_VARS = (
+        "WORKSPACE",
+        "DSS_DSPACE_CREDENTIALS",
+        "INPUT_QUEUE",
+        "OUTPUT_QUEUES",
+    )
+    OPTIONAL_ENV_VARS = (
+        "SENTRY_DSN",
+        "DSPACE_TIMEOUT",
+        "SKIP_PROCESSING",
+        "SQS_ENDPOINT_URL",
+        "WARNING_ONLY_LOGGERS",
+    )
+
+    @property
+    def workspace(self) -> str:
+        return os.getenv("WORKSPACE", "dev")
+
+    @property
+    def dss_dspace_credentials(self) -> str:
+        value = os.getenv("DSS_DSPACE_CREDENTIALS")
+        if not value:
+            raise OSError("Env var 'DSS_DSPACE_CREDENTIALS' must be defined")
+        return value
+
+    @property
+    def input_queue(self) -> str:
+        value = os.getenv("INPUT_QUEUE")
+        if not value:
+            raise OSError("Env var 'INPUT_QUEUE' must be defined")
+        return value
+
+    @property
+    def output_queues(self) -> list[str]:
+        value = os.getenv("OUTPUT_QUEUES")
+        if not value:
+            raise OSError("Env var 'OUTPUT_QUEUES' must be defined")
+        return value.split(",")
+
+    @property
+    def sentry_dsn(self) -> str | None:
+        dsn = os.getenv("SENTRY_DSN")
+        if dsn and dsn.strip().lower() != "none":
+            return dsn
+        return None
+
+    @property
+    def dspace_timeout(self) -> float:
+        value = os.getenv("DSPACE_TIMEOUT", "180")
+        return float(value)
+
+    @property
+    def skip_processing(self) -> bool:
+        value = os.getenv("SKIP_PROCESSING", "false")
+        return value.lower() == "true"
+
+    @property
+    def sqs_endpoint_url(self) -> str | None:
+        return os.getenv("SQS_ENDPOINT_URL")
+
+    @property
+    def warning_only_loggers(self) -> list | None:
+        value = os.getenv("WARNING_ONLY_LOGGERS", "botocore,boto3,smart_open,urllib3")
         try:
-            self.ENV = os.environ["WORKSPACE"]
-        except KeyError:
-            logger.error(  # noqa: TRY400
-                "Env variable 'WORKSPACE' is required, please set it and try again."
-            )
-            raise
-        self.AWS_REGION_NAME = "us-east-1"
-        logger.info(f"Configuring dspace-submission-service for env={self.ENV}")
-        self.load_config_variables(self.ENV)
-
-    def load_config_variables(self, env: str) -> None:
-        # default to using env vars with defaults
-        self.DSPACE_CREDENTIALS = os.getenv("DSS_DSPACE_CREDENTIALS", "{}")
-        self.DSPACE_TIMEOUT = float(os.getenv("DSPACE_TIMEOUT", "180.0"))
-        self.INPUT_QUEUE = os.getenv("INPUT_QUEUE")
-        self.LOG_FILTER = os.getenv("LOG_FILTER", "true").lower()
-        self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-        self.SENTRY_DSN = os.getenv("SENTRY_DSN")
-        self.SKIP_PROCESSING = os.getenv("SKIP_PROCESSING", "false").lower()
-        self.SQS_ENDPOINT_URL = os.getenv("SQS_ENDPOINT_URL")
-        self.OUTPUT_QUEUES = os.getenv("OUTPUT_QUEUES", "output").split(",")
-
-        # if testing environment, override
-        if env == "test":
-            self.DSPACE_CREDENTIALS = json.dumps(
-                {
-                    "ir-6": {
-                        "url": "mock://dspace.edu/rest",
-                        "user": "test",
-                        "password": "test",
-                    },
-                    "ddc-6": {
-                        "url": "mock://dspace.edu/rest",
-                        "user": "test",
-                        "password": "test",
-                    },
-                    "ir-8": {
-                        "url": "mock://dspace.edu/server/api",
-                        "user": "test",
-                        "password": "test",
-                    },
-                    "ddc-8": {
-                        "url": "mock://dspace.edu/server/api",
-                        "user": "test",
-                        "password": "test",
-                    },
-                }
-            )
-            self.DSPACE_TIMEOUT = 3.0
-            self.INPUT_QUEUE = "input_queue"
-            self.LOG_FILTER = "true"
-            self.LOG_LEVEL = "INFO"
-            self.SENTRY_DSN = None
-            self.SKIP_PROCESSING = "false"
-            self.SQS_ENDPOINT_URL = "https://sqs.us-east-1.amazonaws.com/"
-            self.OUTPUT_QUEUES = ["empty_result_queue"]
+            loggers = value.split(",")
+        except AttributeError:
+            return []
+        return loggers
 
     @property
     def dspace_credentials(self) -> dict[str, dict[str, str | float | None]]:
         """Return DSpace credentials for supported instances."""
-        credentials = json.loads(self.DSPACE_CREDENTIALS)
+        credentials = json.loads(self.dss_dspace_credentials)
         return {
             "DSpace@MIT": credentials["ir-6"],
             "IR-8": credentials["ir-8"],
             "DDC-6": credentials["ddc-6"],
             "DDC-8": credentials["ddc-8"],
         }
+
+
+def configure_logger(
+    root_logger: logging.Logger,
+    *,
+    verbose: bool = False,
+    warning_only_loggers: list | None = None,
+) -> str:
+    """Configure application via passed application root logger.
+
+    If verbose=True, 3rd party libraries can be quite chatty.  For convenience, they can
+    be set to WARNING level by either passing a comma seperated list of logger names to
+    'warning_only_loggers' or by setting the env var WARNING_ONLY_LOGGERS.
+    """
+    if verbose:
+        root_logger.setLevel(logging.DEBUG)
+        logging_format = (
+            "%(asctime)s %(levelname)s %(name)s.%(funcName)s() "
+            "line %(lineno)d: %(message)s"
+        )
+    else:
+        root_logger.setLevel(logging.INFO)
+        logging_format = "%(asctime)s %(levelname)s %(name)s.%(funcName)s(): %(message)s"
+
+    if warning_only_loggers:
+        for name in warning_only_loggers:
+            logging.getLogger(name).setLevel(logging.WARNING)
+
+    for handler in root_logger.handlers[:]:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setFormatter(logging.Formatter(logging_format))
+            break
+
+    return (
+        f"Logger '{root_logger.name}' configured with level="
+        f"{logging.getLevelName(root_logger.getEffectiveLevel())}"
+    )
+
+
+def configure_sentry() -> None:
+    env = os.getenv("WORKSPACE")
+    sentry_dsn = os.getenv("SENTRY_DSN")
+    if sentry_dsn and sentry_dsn.lower() != "none":
+        sentry_sdk.init(sentry_dsn, environment=env)
+        logger.info(f"Sentry DSN found, exceptions will be sent to Sentry with env={env}")
+    else:
+        logger.info("No Sentry DSN found, exceptions will not be sent to Sentry")

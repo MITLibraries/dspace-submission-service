@@ -1,50 +1,39 @@
-# ruff: noqa: SIM300
-import json
-import os
+from unittest.mock import patch
 
 import pytest
 
-from submitter.config import Config
+from submitter.config import Config, configure_sentry
+
+CONFIG = Config()
 
 
-def test_config_without_workspace_env_raises_error():
-    del os.environ["WORKSPACE"]
-    with pytest.raises(KeyError):
-        Config()
+def test_config_env_var_access():
+    assert CONFIG.workspace == "test"
 
 
-def test_config_from_env_success():
-    os.environ["WORKSPACE"] = "stage"
-    config = Config()
-    assert config.DSPACE_CREDENTIALS == json.dumps(
-        {
-            "ir-6": {
-                "url": "mock://dspace.edu/rest",
-                "user": "test",
-                "password": "test",
-            },
-            "ddc-6": {
-                "url": "mock://dspace.edu/rest",
-                "user": "test",
-                "password": "test",
-            },
-            "ir-8": {
-                "url": "mock://dspace.edu/server/api",
-                "user": "test",
-                "password": "test",
-            },
-            "ddc-8": {
-                "url": "mock://dspace.edu/server/api",
-                "user": "test",
-                "password": "test",
-            },
-        }
-    )
-    assert config.DSPACE_TIMEOUT == 3.0  # noqa: PLR2004
-    assert config.INPUT_QUEUE == "input_queue"
-    assert config.LOG_FILTER == "false"
-    assert config.LOG_LEVEL == "INFO"
-    assert config.SENTRY_DSN == "mock://12345.6789.sentry"
-    assert config.SKIP_PROCESSING == "true"
-    assert config.SQS_ENDPOINT_URL == "https://sqs.us-east-1.amazonaws.com/"
-    assert config.OUTPUT_QUEUES == ["output_queue_1", "output_queue_2"]
+def test_config_optional_env_var_access(monkeypatch):
+    monkeypatch.delenv("DSPACE_TIMEOUT")
+    assert CONFIG.dspace_timeout
+
+
+def test_config_required_env_var_access(monkeypatch):
+    monkeypatch.delenv("INPUT_QUEUE")
+    with pytest.raises(OSError):  # noqa: PT011
+        _ = CONFIG.input_queue
+
+
+def test_config_configures_sentry_if_dsn_present(caplog, monkeypatch):
+    monkeypatch.setenv("SENTRY_DSN", "https://1234567890@00000.ingest.sentry.io/123456")
+    with patch("sentry_sdk.init") as mock_init:
+        configure_sentry()
+        mock_init.assert_called_once()
+        assert (
+            "Sentry DSN found, exceptions will be sent to Sentry with env=test"
+            in caplog.text
+        )
+
+
+def test_config_doesnt_configure_sentry_if_dsn_not_present(caplog, monkeypatch):
+    monkeypatch.delenv("SENTRY_DSN", raising=False)
+    configure_sentry()
+    assert "No Sentry DSN found, exceptions will not be sent to Sentry" in caplog.text

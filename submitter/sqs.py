@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 
 import boto3
 
-from submitter import CONFIG, errors
+from submitter import errors
+from submitter.config import Config
 from submitter.submission import Submission
 
 if TYPE_CHECKING:
@@ -13,13 +14,13 @@ if TYPE_CHECKING:
     from mypy_boto3_sqs.type_defs import SendMessageResultTypeDef
 
 logger = logging.getLogger(__name__)
+CONFIG = Config()
 
 
 def sqs_client() -> "SQSServiceResource":
     return boto3.resource(
         service_name="sqs",
-        region_name=CONFIG.AWS_REGION_NAME,
-        endpoint_url=CONFIG.SQS_ENDPOINT_URL,
+        endpoint_url=CONFIG.sqs_endpoint_url,
     )
 
 
@@ -39,10 +40,10 @@ def process(msgs: list["Message"]) -> None:
     for message in msgs:
         message_id = message.message_id
         logger.info(
-            "Processing message '%s' from queue '%s'", message_id, CONFIG.INPUT_QUEUE
+            "Processing message '%s' from queue '%s'", message_id, CONFIG.input_queue
         )
 
-        if CONFIG.SKIP_PROCESSING == "true":
+        if CONFIG.skip_processing == "true":
             logger.info("Skipping processing due to config")
         else:
             submission = Submission.from_message(message)
