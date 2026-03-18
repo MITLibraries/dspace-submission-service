@@ -382,11 +382,9 @@ def test_submit_item_dspace8_success(dspace8_submission_instance):
 
 
 @patch("submitter.submission.DSpace8Client.create_item")
-def test_submit_item_dspace8_item_create_error(
-    mock_create_item, dspace8_submission_instance
-):
-    mock_create_item.side_effect = RequestException
-    with pytest.raises(errors.ItemCreateError):
+def test_submit_item_dspace8_item_error(mock_create_item, dspace8_submission_instance):
+    mock_create_item.return_value = DSpace8Item()
+    with pytest.raises(errors.ItemError):
         dspace8_submission_instance._submit_item_dspace8()
 
 
@@ -395,7 +393,7 @@ def test_submit_item_dspace8_bundle_create_error_raises_exception(
     mock_create_bundle, dspace8_submission_instance, caplog
 ):
     mock_create_bundle.side_effect = RequestException
-    with pytest.raises(errors.BundleCreateError):
+    with pytest.raises(errors.BundleError):
         dspace8_submission_instance._submit_item_dspace8()
     assert "Error creating bundle:" in caplog.text
 
@@ -409,7 +407,7 @@ def test_submit_item_dspace8_bitstream_error_raises_exception(
 ):
     mock_create_bitstream.side_effect = RequestException
 
-    with pytest.raises(errors.BitstreamCreateError):
+    with pytest.raises(errors.BitstreamError):
         dspace8_submission_instance._submit_item_dspace8()
     assert "Error creating bitstream:" in caplog.text
 
@@ -421,7 +419,7 @@ def test_submit_item_dspace8_bitstream_error_triggers_cleanup(
     bitstream = DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
     mock_create_bitstream.side_effect = [bitstream, RequestException]
 
-    with pytest.raises(errors.BitstreamCreateError):
+    with pytest.raises(errors.BitstreamError):
         dspace8_submission_instance._submit_item_dspace8()
 
     assert "Error creating bitstream:" in caplog.text
@@ -438,7 +436,7 @@ def test_submit_item_dspace8_bitstream_error_cleanup_failure_logs_exception(
     mock_create_bitstream.side_effect = [bitstream, RequestException]
     mock_delete_dso.side_effect = RequestException
 
-    with pytest.raises(errors.BitstreamCreateError):
+    with pytest.raises(errors.BitstreamError):
         dspace8_submission_instance._submit_item_dspace8()
 
     assert "Error creating bitstream:" in caplog.text
