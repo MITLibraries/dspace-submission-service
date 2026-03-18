@@ -20,25 +20,6 @@ uv run submitter --help
 The [Click documentation](https://click.palletsprojects.com/en/8.0.x/quickstart/)
 will be helpful to understand how to create and run commands.
 
-Set env variables in `.env` file as needed:
-- WORKSPACE: required, "dev" is a good value for local development
-- DSS_DSPACE_CREDENTIALS: An array containing credentials for all supported DSpace instances
-- DSPACE_TIMEOUT: only needed if publishing to DSpace, defaults to 120 seconds
-- INPUT_QUEUE: input message queue to use for development (see section below on
-  using Moto for local SQS queues)
-- LOG_FILTER: filters out logs from external libraries, defaults to "true".
-  Can be useful to set this to "false" if there are errors that seem to involve
-  external libraries whose debug logs may have more information
-- LOG_LEVEL: level for logging, defaults to INFO. Can be useful to set to DEBUG for
-  more detailed logging
-- OUTPUT_QUEUES: comma-separated string list of valid output queues, defaults to
-  "output". Update if using a different name for the output queue(s) in development
-- SKIP_PROCESSING: skips the publishing process for messages, defaults to "true". Can
-  be useful for working on just the SQS components of the application. Set to "false"
-  if messages should be processed and published
-- SQS_ENDPOINT_URL: needed if using Moto for local development (see section below)
-
-
 ### Using Moto for local SQS queues
 
 It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode(https://github.com/spulec/moto#stand-alone-server-mode)] rather than using true AWS SQS queues.
@@ -96,6 +77,31 @@ docker run submitter:latest --
 The `Makefile` contains commands for running the application in the `dev`, `stage`, and `prod` environments as an ECS task. 
 
 The commands are produced by the Terraform used to create the infrastructure and copy/pasted here for convenience. Calling each command will execute the latest version of the container in the specified environment.
+
+
+## Environment Variables
+
+### Required
+
+```shell
+WORKSPACE=#Set to `dev` for local development, this will be set to `stage` and `prod` in those environments by Terraform.
+DSS_DSPACE_CREDENTIALS=#A collection of DSpace credentials formatted as a JSON string, where the key is a short name for a DSpace repository indicated in submission messages and values are credentials for a user account with keys for url, user, and password.
+INPUT_QUEUE=#Input message queue to use for development (see section below on using Moto for local SQS queues)
+OUTPUT_QUEUES=#Comma-separated string representing a list of valid output queues.
+```
+
+### Optional
+
+```shell
+SENTRY_DSN=#If set to a valid Sentry DSN, enables Sentry exception monitoring. This is not needed for local development.
+DSPACE_TIMEOUT=#Request time out for DSpace, defaults to 180 seconds.
+LOG_FILTER=# filters out logs from external libraries, defaults to "true". Can be useful to set this to "false" if there are errors that seem to involve external libraries whose debug logs may have more information
+LOG_LEVEL=# level for logging, defaults to INFO. Can be useful to set to DEBUG for more detailed logging
+SKIP_PROCESSING=#Skip ingesting items into DSpace, defaults to "false".
+SQS_ENDPOINT_URL=#URL of the entry point for SQS. Only needed if using Moto for local development. Defaults to None; in `prod`, botocore will automatically construct the appropriate URL to use when communicating with a service.
+WARNING_ONLY_LOGGERS=#Comma-separated list of logger names to set as WARNING only, e.g. 'botocore,smart_open,urllib3'.
+```
+
 
 ## Related Assets
 

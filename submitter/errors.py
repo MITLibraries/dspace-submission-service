@@ -9,9 +9,10 @@ import logging
 
 from requests.exceptions import RequestException
 
-from submitter import CONFIG
+from submitter.config import Config
 
 logger = logging.getLogger(__name__)
+CONFIG = Config()
 
 
 class InvalidDSpaceDestinationError(Exception):
@@ -197,7 +198,7 @@ class DSpaceTimeoutError(Exception):
         submission_attributes: dict,
     ):
         self.message = (
-            f"DSpace server at '{dspace_url}' took more than {CONFIG.DSPACE_TIMEOUT} "
+            f"DSpace server at '{dspace_url}' took more than {CONFIG.dspace_timeout} "
             "seconds to respond. Aborting DSpace Submission Service processing until "
             "this can be investigated.\nNOTE: The submission in process when this "
             "occurred likely has partially published data in DSpace. The package id "
@@ -276,9 +277,9 @@ class SubmitMessageInvalidResultQueueError(Exception):
         self.message = (
             "Aborting DSS processing due to a non-recoverable error:\nError occurred "
             f"while processing message '{message_id}' from input queue "
-            f"'{CONFIG.INPUT_QUEUE}'. Message provided invalid result queue name "
+            f"'{CONFIG.input_queue}'. Message provided invalid result queue name "
             f"'{result_queue}'. Valid result queue names are: "
-            f"{CONFIG.OUTPUT_QUEUES}."
+            f"{CONFIG.output_queues}."
         )
 
 
@@ -297,6 +298,6 @@ class SubmitMessageMissingAttributeError(Exception):
         self.message = (
             "Aborting DSS processing due to a non-recoverable error:\nError occurred "
             f"while processing message '{message_id}' from input queue "
-            f"'{CONFIG.INPUT_QUEUE}'. Message was missing required attribute "
+            f"'{CONFIG.input_queue}'. Message was missing required attribute "
             f"'{attribute_name}'."
         )

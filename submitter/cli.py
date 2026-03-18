@@ -2,7 +2,7 @@ import logging
 
 import click
 
-from submitter import CONFIG
+from submitter.config import Config, configure_logger, configure_sentry
 from submitter.errors import DSpaceAuthenticationError
 from submitter.message import (
     generate_result_messages_from_file,
@@ -12,16 +12,32 @@ from submitter.sqs import create, message_loop, write_message_to_queue
 from submitter.submission import Submission
 
 logger = logging.getLogger(__name__)
+CONFIG = Config()
 
 
 @click.group()
-def main() -> None:
-    pass
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    required=False,
+    help="Flag for verbose output.",
+)
+def main(*, verbose: bool) -> None:
+    root_logger = logging.getLogger()
+    logger.info(
+        configure_logger(
+            root_logger=root_logger,
+            verbose=verbose,
+            warning_only_loggers=CONFIG.warning_only_loggers,
+        )
+    )
+    configure_sentry()
 
 
 @main.command()
 @click.option(
-    "--queue", default=CONFIG.INPUT_QUEUE, help="Name of queue to process messages from"
+    "--queue", envvar="INPUT_QUEUE", help="Name of queue to process messages from"
 )
 @click.option("--wait", default=20, help="seconds to wait for long polling. max 20")
 def start(queue: str, wait: int) -> None:
@@ -34,7 +50,7 @@ def start(queue: str, wait: int) -> None:
 @click.option(
     "-i",
     "--input-queue",
-    default=CONFIG.INPUT_QUEUE,
+    envvar="INPUT_QUEUE",
     help="Name of queue to load sample messages to",
 )
 @click.option(

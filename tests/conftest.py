@@ -603,14 +603,12 @@ def test_env(monkeypatch):
             }
         ),
     )
-    monkeypatch.setenv("DSPACE_TIMEOUT", "3.0")
     monkeypatch.setenv("INPUT_QUEUE", "input_queue")
-    monkeypatch.setenv("LOG_FILTER", "false")
-    monkeypatch.setenv("LOG_LEVEL", "INFO")
-    monkeypatch.setenv("SENTRY_DSN", "mock://12345.6789.sentry")
+    monkeypatch.setenv("OUTPUT_QUEUES", "empty_result_queue")
+    monkeypatch.setenv("SENTRY_DSN", "https://1234567890@00000.ingest.sentry.io/123456")
+    monkeypatch.setenv("DSPACE_TIMEOUT", "3")
     monkeypatch.setenv("SKIP_PROCESSING", "true")
     monkeypatch.setenv("SQS_ENDPOINT_URL", "https://sqs.us-east-1.amazonaws.com/")
-    monkeypatch.setenv("OUTPUT_QUEUES", "output_queue_1,output_queue_2")
 
 
 item_post_response_01 = {
