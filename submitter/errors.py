@@ -297,3 +297,12 @@ class SubmitMessageMissingAttributeError(Exception):
             f"'{CONFIG.input_queue}'. Message was missing required attribute "
             f"'{attribute_name}'."
         )
+
+
+# Submission message validation errors
+class SubmissionMessageAttributesValidationError(Exception):
+    """Exception raised due when submission message attributes are invalid"""
+
+
+class SubmissionMessageBodyValidationError(Exception):
+    """Exception raised due when submission message body is invalid"""

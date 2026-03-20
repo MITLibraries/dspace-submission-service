@@ -1,4 +1,5 @@
 # ruff: noqa: SLF001
+import re
 import sys
 import traceback
 from unittest.mock import patch
@@ -106,27 +107,62 @@ def test_submission_from_message_dspace6_success(
     assert submission.result_queue == "empty_result_queue"
 
 
-def test_submission_from_message_dspace6_creates_error_message(
-    input_message_nonconforming_body, mocked_dspace
+def test_submission_from_message_dspace8_success(
+    input_message_good_dspace8, mocked_dspace
 ):
-    submission = Submission.from_message(input_message_nonconforming_body)
+    submission = Submission.from_message(input_message_good_dspace8)
+    assert submission.destination == "IR-8"
+    assert submission.collection_handle == "0000/collection01"
+    assert submission.metadata_location == "tests/fixtures/test-item-metadata.json"
+    assert submission.files == [
+        {
+            "BitstreamName": "test-file-01.pdf",
+            "FileLocation": "tests/fixtures/test-file-01.pdf",
+            "BitstreamDescription": "A test bitstream",
+        }
+    ]
+    assert submission.result_attributes == {
+        "PackageID": {"DataType": "String", "StringValue": "etdtest01"},
+        "SubmissionSource": {"DataType": "String", "StringValue": "etd"},
+    }
+    assert submission.result_message is None
+    assert submission.result_queue == "empty_result_queue"
+
+
+def test_submission_from_message_handles_message_body_jsondecodeerror(
+    input_message_invalid_json, mocked_dspace
+):
+    submission = Submission.from_message(input_message_invalid_json)
     assert submission.result_message == (
-        "Submission message did not conform to the DSS specification. Message body "
-        "provided was: 'Doesn't conform to the DSS spec'"
+        "Unable to parse submission message body. Message body provided was: "
+        "'Doesn't conform to the DSS spec'"
     )
 
 
-def test_submission_from_message_dspace6_raises_invalid_queue_error(
+def test_submission_from_message_handles_message_body_validationerror(
+    input_message_missing_collection_handle,
+):
+    submission = Submission.from_message(input_message_missing_collection_handle)
+    assert "'CollectionHandle' is a required property" in submission.result_message
+
+
+def test_submission_from_message_invalid_queue_raises_message_attr_validationerror(
     input_message_invalid_queue, mocked_dspace
 ):
-    with pytest.raises(errors.SubmitMessageInvalidResultQueueError):
+    with pytest.raises(
+        errors.SubmissionMessageAttributesValidationError,
+        match=re.escape("'not-a-queue' is not one of ['empty_result_queue']"),
+    ):
         Submission.from_message(input_message_invalid_queue)
 
 
-def test_submission_from_message_raises_missing_attribute_error(
+def test_submission_from_message_missing_required_raises_message_attr_validationerror(
     input_message_missing_attribute,
 ):
-    with pytest.raises(errors.SubmitMessageMissingAttributeError):
+    with pytest.raises(
+        errors.SubmissionMessageAttributesValidationError,
+        match=re.escape("'SubmissionSource' is a required property"),
+    ):
         Submission.from_message(input_message_missing_attribute)
 
 
@@ -279,13 +315,7 @@ def test_submit_dspace6_add_bitstreams_error(
 ):
     mock_dspace_client.return_value = test_dspace6_client
     submission = Submission.from_message(input_message_bitstream_create_error)
-    submission.submit()
-    assert submission.result_message["ResultType"] == "error"
-    assert (
-        submission.result_message["ErrorInfo"]
-        == "Error occurred while parsing bitstream information from files listed in "
-        "submission message."
-    )
+    assert submission.result_message == "'FileLocation' is a required property"
 
 
 @patch("submitter.submission.DSpace6Client")

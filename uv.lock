@@ -1710,6 +1710,7 @@ dependencies = [
     { name = "click" },
     { name = "dspace-python-client" },
     { name = "dspace-rest-client" },
+    { name = "jsonschema" },
     { name = "sentry-sdk" },
     { name = "smart-open" },
 ]
@@ -1740,6 +1741,7 @@ requires-dist = [
     { name = "click" },
     { name = "dspace-python-client", git = "https://github.com/mitlibraries/dspace-python-client.git" },
     { name = "dspace-rest-client", specifier = ">=0.1.16" },
+    { name = "jsonschema" },
     { name = "sentry-sdk" },
     { name = "smart-open" },
 ]

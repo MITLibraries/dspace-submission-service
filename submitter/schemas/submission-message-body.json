@@ -1,0 +1,86 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "DSS Submission Message Body Specification",
+    "description": "Schema to validate submission message body",
+    "type": "object",
+    "properties": {
+        "SubmissionSystem": {
+            "description": "Specific system to submit to",
+            "type": "string"
+        },
+        "Operation": {
+            "description": "Action to perform: create a new item or update an existing one",
+            "type": "string",
+            "default": "create",
+            "enum": [
+                "create",
+                "update"
+            ]
+        },
+        "CollectionHandle": {
+            "description": "Handle for DSpace Collection for created items",
+            "type": "string"
+        },
+        "ItemHandle": {
+            "description": "Handle for DSpace Item to be updated",
+            "type": "string"
+        },
+        "MetadataLocation": {
+            "description": "S3 URI for item metadata JSON file",
+            "type": "string"
+        },
+        "Files": {
+            "description": "Bitstreams for an item",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "BitstreamName": {
+                        "description": "Required - name of Bitstream in DSpace, e.g. 'baker_report.pdf'",
+                        "type": "string"
+                    },
+                    "FileLocation": {
+                        "description": "Required - S3 URI for Bitstream file , e.g. 'S3://bucket/baker_report.pdf'",
+                        "type": "string"
+                    },
+                    "BitstreamDescription": {
+                        "description": "Optional - description of Bitstream in DSpace, e.g. 'The Baker Report'",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "BitstreamName",
+                    "FileLocation"
+                ]
+            }
+        }
+    },
+    "required": [
+        "SubmissionSystem",
+        "MetadataLocation",
+        "Files"
+    ],
+    "if": {
+        "properties": {
+            "Operation": {
+                "const": "update"
+            }
+        },
+        "required": [
+            "Operation"
+        ]
+    },
+    "then": {
+        "required": [
+            "ItemHandle"
+        ]
+    },
+    "else": {
+        "required": [
+            "CollectionHandle"
+        ]
+    }
+}

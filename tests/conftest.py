@@ -340,7 +340,29 @@ def input_message_good_dspace8(mocked_sqs):
 
 
 @pytest.fixture
-def input_message_nonconforming_body(mocked_sqs):
+def input_message_missing_collection_handle(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
+    queue.send_message(
+        MessageAttributes=test_attributes,
+        MessageBody=json.dumps(
+            {
+                "SubmissionSystem": "DSpace@MIT",
+                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
+                "Files": [
+                    {
+                        "BitstreamName": "test-file-01.pdf",
+                        "FileLocation": "tests/fixtures/test-file-01.pdf",
+                        "BitstreamDescription": "A test bitstream",
+                    }
+                ],
+            }
+        ),
+    )
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
+
+
+@pytest.fixture
+def input_message_invalid_json(mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
     queue.send_message(
         MessageAttributes=test_attributes,

@@ -1,0 +1,49 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "DSS Submission Message Attributes Specification",
+    "description": "Schema to validate submission message attributes",
+    "type": "object",
+    "properties": {
+        "PackageID": {
+            "type": "object",
+            "properties": {
+                "DataType": {
+                    "const": "String"
+                },
+                "StringValue": {
+                    "description": "A unique ID created by the submitting application that will allow said application to match the result information to each submitted package, e.g. 'etd_123123' or '98765'. This system is agnostic about the value of the ID.",
+                    "type": "string"
+                }
+            }
+        },
+        "SubmissionSource": {
+            "type": "object",
+            "properties": {
+                "DataType": {
+                    "const": "String"
+                },
+                "StringValue": {
+                    "description": "Name of the submitting system, e.g. 'ETD'. Should be consistent for each submitting system (should not change over time",
+                    "type": "string"
+                }
+            }
+        },
+        "OutputQueue": {
+            "type": "object",
+            "properties": {
+                "DataType": {
+                    "const": "String"
+                },
+                "StringValue": {
+                    "description": "Name of the pre-agreed upon output SQS queue to be used for the submitting system. The queue must already exist and both systems must have appropriate access to the queue.",
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "required": [
+        "PackageID",
+        "SubmissionSource",
+        "OutputQueue"
+    ]
+}

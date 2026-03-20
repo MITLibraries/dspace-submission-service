@@ -6,7 +6,8 @@ import sys
 import traceback
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from enum import StrEnum
+from typing import TYPE_CHECKING, Literal
 
 import dspace
 import requests
@@ -25,6 +26,7 @@ from dspace_rest_client.models import Item as DSpace8Item
 
 from submitter import errors
 from submitter.config import Config
+from submitter.message import validate_message
 
 if TYPE_CHECKING:
     from mypy_boto3_sqs.service_resource import Message
@@ -38,8 +40,12 @@ dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
 )  # Update after DSpace 8 migration
 
 
-class Submission:
+class ValidItemOperations(StrEnum):
+    CREATE = "create"
+    UPDATE = "update"
 
+
+class Submission:
     def __init__(
         self,
         attributes: dict,
@@ -47,12 +53,18 @@ class Submission:
         *,
         result_message: dict | str | None = None,
         destination: str | None = None,
+        operation: (
+            Literal[ValidItemOperations.CREATE, ValidItemOperations.UPDATE] | None
+        ) = ValidItemOperations.CREATE,
         collection_handle: str | None = None,
+        item_handle: str | None = None,
         metadata_location: str | None = None,
         files: list[dict] | None = None,
     ) -> None:
         self.destination = destination
+        self.operation = operation
         self.collection_handle = collection_handle
+        self.item_handle = item_handle
         self.metadata_location = metadata_location
         self.files = files
         self.result_attributes = attributes
@@ -185,51 +197,40 @@ class Submission:
             message: An SQS message
 
         Raises:
-            SubmitMessageInvalidResultQueueError
-            SubmitMessageMissingAttributeError
+            SubmissionMessageAttributesValidationError
+            SubmissionMessageBodyValidationError
         """
-        result_queue = message.message_attributes.get(  # type: ignore[call-overload]
-            "OutputQueue", {}
-        ).get("StringValue")
-        if not result_queue or result_queue not in CONFIG.output_queues:
-            raise errors.SubmitMessageInvalidResultQueueError(
-                message.message_id, result_queue
-            )
-
         try:
-            attributes = {
-                "PackageID": message.message_attributes["PackageID"],
-                "SubmissionSource": message.message_attributes["SubmissionSource"],
-            }
-        except KeyError as e:
-            raise errors.SubmitMessageMissingAttributeError(
-                message.message_id, e.args[0]
-            ) from e
-
-        try:
-            body = json.loads(message.body)
-            destination = body["SubmissionSystem"]
-            collection_handle = body["CollectionHandle"]
-            metadata_location = body["MetadataLocation"]
-            files = body["Files"]
-        except (json.JSONDecodeError, KeyError, TypeError):
-            result_message = (
-                "Submission message did not conform to the DSS specification. Message "
-                f"body provided was: '{message.body}'"
-            )
+            message_attributes, message_body = validate_message(message)
+        except errors.SubmissionMessageBodyValidationError as exception:
+            result_queue = message.message_attributes.pop("OutputQueue")["StringValue"]
             return cls(
-                attributes,
-                result_queue,
-                result_message=result_message,
+                attributes=message.message_attributes,
+                result_queue=result_queue,
+                result_message=str(exception),
             )
 
+        result_queue = message_attributes.pop("OutputQueue")["StringValue"]
+        operation = message_body.get("Operation", ValidItemOperations.CREATE)
+
+        if operation == ValidItemOperations.UPDATE:
+            return cls(
+                attributes=message_attributes,
+                result_queue=result_queue,
+                destination=message_body["SubmissionSystem"],
+                operation=operation,
+                item_handle=message_body["ItemHandle"],
+                metadata_location=message_body["MetadataLocation"],
+                files=message_body["Files"],
+            )
         return cls(
-            attributes,
-            result_queue,
-            destination=destination,
-            collection_handle=collection_handle,
-            metadata_location=metadata_location,
-            files=files,
+            attributes=message_attributes,
+            result_queue=result_queue,
+            destination=message_body["SubmissionSystem"],
+            operation=operation,
+            collection_handle=message_body["CollectionHandle"],
+            metadata_location=message_body["MetadataLocation"],
+            files=message_body["Files"],
         )
 
     def _submit_item_dspace6(  # Update after DSpace 8 migration
