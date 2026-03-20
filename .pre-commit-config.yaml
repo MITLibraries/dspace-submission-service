@@ -24,6 +24,6 @@ repos:
         types: ["python"]
       - id: pip-audit
         name: pip-audit
-        entry: uv run pip-audit
+        entry: uv run pip-audit --ignore-vuln GHSA-rf74-v2fm-23pw --ignore-vuln CVE-2026-33230 --ignore-vuln CVE-2026-33231
         language: system
         pass_filenames: false

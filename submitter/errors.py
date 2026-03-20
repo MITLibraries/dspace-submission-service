@@ -28,73 +28,69 @@ class InvalidDSpaceDestinationError(Exception):
         self.message = f"Invalid DSpace destination specified: '{destination}'."
 
 
-class ItemCreateError(Exception):
-    """Exception raised when creating an item instance from a submission message.
+class SubmissionError(Exception):
+    def __init__(self, message: str, exception: Exception | None = None):
+        self.message = message
+        self.exception = exception
+
+        if (
+            isinstance(self.exception, RequestException)
+            and self.exception.response is not None
+        ):
+            self.dspace_error = self.exception.response.text
+
+
+class DSpaceObjectNotFoundError(SubmissionError):
+    """Exception raised when identifier was not resolved to a DSpace object.
+
+    The client for DSpace 8 will return None if it either did not find any objects
+    associated with the identifier, which should be a handle or DOI, or
+    the identifier was not resolvable.
+
+    https://github.com/DSpace/RestContract/blob/main/identifiers.md#find-dso-by-identifier-endpoint
+    """
+
+    def __init__(self, identifier: str):
+        self.message = f"Did not find any DSpace objects associated with the identifier: '{identifier}'"  # noqa: E501
+
+
+class ItemError(SubmissionError):
+    """Exception raised when creating or updating an item in DSpace.
+
+    This exception is used in the following cases:
+        - The DSpace client will returns an Item object without an item handle
 
     Args:
         exception: The exception raised during item creation
-        metadata_file: Location of the metadata JSON file specified in the submission
-            message
 
     Attributes:
         message (str): Explanation of the error
         dspace_error (str): Error message returned by the DSpace server, if applicable
-
     """
 
-    def __init__(self, exception: Exception, metadata_file: str | None):
-        self.message = (
-            "Error occurred while creating item metadata entries from file "
-            f"'{metadata_file}'"
-        )
-        if isinstance(exception, RequestException) and exception.response is not None:
-            self.dspace_error = exception.response.text
 
-
-class BundleCreateError(Exception):
-    """Exception raised when posting a bundle for an item in DSpace.
+class BundleError(SubmissionError):
+    """Exception raised when creating a bundle for an item in DSpace.
 
     Args:
         exception: The exception raised during bundle creation
-        item_handle: Handle of posted item that bundle belongs to
 
     Attributes:
         message (str): Explanation of the error
         dspace_error (str): Error message returned by the DSpace server, if applicable
     """
 
-    def __init__(
-        self,
-        exception: Exception,
-        item_handle: str,
-    ):
-        self.message = (
-            f"Error occurred while posting bundle for item '{item_handle}' in "
-            "DSpace. Item and any bitstreams already posted to it will be deleted"
-        )
-        if isinstance(exception, RequestException) and exception.response is not None:
-            self.dspace_error = exception.response.text
 
-
-class BitstreamCreateError(Exception):
+class BitstreamError(SubmissionError):
     """Exception raised when creating a bitstream instance from a submission message.
 
     Args:
         exception: The exception raised during bitstream creation
-        bitstream_file: Location of the bitstream file specified in the submission
-            message
+
     Attributes:
         message (str): Explanation of the error
         dspace_error (str): Error message returned by the DSpace server, if applicable
     """
-
-    def __init__(self, exception: Exception, bitstream_file: str, item_handle: str):
-        self.message = (
-            f"Error occurred while creating bitstream from file '{bitstream_file}' "
-            f"for item '{item_handle}'"
-        )
-        if isinstance(exception, RequestException) and exception.response is not None:
-            self.dspace_error = exception.response.text
 
 
 class ItemPostError(Exception):  # Update after DSpace 8 migration

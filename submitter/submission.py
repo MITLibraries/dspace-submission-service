@@ -1,3 +1,4 @@
+# ruff: noqa: TD002, TD003, FIX002
 import json
 import logging
 import os
@@ -91,9 +92,7 @@ class Submission:
 
         # Expected exception, generate error message and continue
         except (
-            errors.ItemCreateError,
-            errors.BundleCreateError,
-            errors.BitstreamCreateError,
+            errors.SubmissionError,
             errors.ItemPostError,  # Update after DSpace 8 migration
             errors.BitstreamAddError,  # Update after DSpace 8 migration
             errors.BitstreamOpenError,  # Update after DSpace 8 migration
@@ -244,7 +243,13 @@ class Submission:
                 metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
                 item.metadata.append(metadata_entry)
         except KeyError as e:
-            raise errors.ItemCreateError(e, self.metadata_location) from e
+            raise errors.ItemError(
+                message=(
+                    "Error occurred while creating item metadata entries from file "
+                    f"'{self.metadata_location}'"
+                ),
+                exception=e,
+            ) from e
 
         item = self._add_bitstreams_to_item_dspace6(item)
         self._post_item_dspace6(item, self.collection_handle)
@@ -332,25 +337,60 @@ class Submission:
         return item, bundle
 
     def _create_item_dspace8(self) -> DSpace8Item:
-        """Create item in DSpace from submission message."""
+        """Create item in DSpace from submission message.
+
+        Note: Separate try-except blocks is are added to distinguish any errors
+        related to accessing and opening the file in S3 from errors related
+        requests to the DSpace server. For the former, the exception is not
+        passed to ItemError to avoid incorrect assignment to Submission.dspace_error.
+        """
+        # check whether the collection exists
+        collection = self.client.resolve_identifier_to_dso(
+            identifier=self.collection_handle
+        )
+        if self.collection_handle and not collection:
+            raise errors.DSpaceObjectNotFoundError(identifier=self.collection_handle)
+
         try:
-            # Verify the specified collection exists
-            collection = self.client.resolve_identifier_to_dso(
-                identifier=self.collection_handle
-            )
             with smart_open.open(self.metadata_location, "r") as metadata:
                 item_data = {
                     "metadata": json.load(metadata),
                     "discoverable": True,
                     "type": "item",
                 }
-                item = self.client.create_item(
-                    parent=collection.uuid,
-                    item=DSpace8Item(item_data),
-                )
         except Exception as e:
             logger.exception("Error creating item:")
-            raise errors.ItemCreateError(e, self.metadata_location) from e
+            raise errors.ItemError(
+                message=f"Failed to load metadata from {self.metadata_location}"
+            ) from e
+
+        try:
+            item = self.client.create_item(
+                parent=collection.uuid,
+                item=DSpace8Item(item_data),
+            )
+        except Exception as e:
+            logger.exception("Error creating item:")
+            raise errors.ItemError(
+                message=(
+                    "Error occurred while creating item from file "
+                    f"'{self.metadata_location}'"
+                ),
+                exception=e,
+            ) from e
+
+        # TODO: This check is added to raise an exception when the returned
+        # Item object's handle is None. Should be updated if/when dspace-rest-python
+        # is updated to raise exceptions.
+        if item.handle is None:
+            logger.exception("Error creating item:")
+            raise errors.ItemError(
+                message=(
+                    "Error occurred while creating item from file "
+                    f"'{self.metadata_location}'"
+                )
+            )
+
         logger.info(f"Item created with handle: {item.handle}")
         return item
 
@@ -361,7 +401,27 @@ class Submission:
         except Exception as e:
             logger.exception("Error creating bundle:")
             self.clean_up_partial_success_dspace8(item)
-            raise errors.BundleCreateError(e, item.handle) from e
+            raise errors.BundleError(
+                message=(
+                    f"Error occurred while creating bundle for item '{item.handle}' "
+                    "in DSpace. Item and any bitstreams already posted to it will be deleted"  # noqa: E501
+                ),
+                exception=e,
+            ) from e
+
+        # TODO: This check is added to raise an exception when the returned
+        # Bundle object's uuid is None. Should be updated if/when dspace-rest-python
+        # is updated to raise exceptions.
+        if bundle.uuid is None:
+            logger.exception("Error creating bundle:")
+            self.clean_up_partial_success_dspace8(item)
+            raise errors.BundleError(
+                message=(
+                    f"Error occurred while creating bundle for item '{item.handle}' "
+                    "in DSpace. Item and any bitstreams already posted to it will be deleted"  # noqa: E501
+                )
+            )
+
         logger.info(f"Bundle created with UUID: {bundle.uuid}")
         return bundle
 
@@ -378,9 +438,27 @@ class Submission:
         except Exception as e:
             logger.exception("Error creating bitstream:")
             self.clean_up_partial_success_dspace8(item)
-            raise errors.BitstreamCreateError(
-                e, bitstream_data["BitstreamName"], item.handle
+            raise errors.BitstreamError(
+                message=(
+                    "Error occurred while creating bitstream from file "
+                    f"'{bitstream_data["BitstreamName"]}' for item '{item.handle}'"
+                ),
+                exception=e,
             ) from e
+
+        # TODO: This check is added to raise an exception when the client
+        # returns None. Should be updated if/when dspace-rest-python
+        # is updated to raise exceptions.
+        if bitstream is None:
+            logger.exception("Error creating bitstream:")
+            self.clean_up_partial_success_dspace8(item)
+            raise errors.BitstreamError(
+                message=(
+                    "Error occurred while creating bitstream from file "
+                    f"'{bitstream_data["BitstreamName"]}' for item '{item.handle}'"
+                ),
+            )
+
         logger.info(f"Bitstream created with UUID: {bitstream.uuid}")
 
     def result_error_message(
