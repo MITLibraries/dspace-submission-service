@@ -106,7 +106,6 @@ class Submission:
         except (
             errors.SubmissionError,
             errors.ItemPostError,  # Update after DSpace 8 migration
-            errors.BitstreamAddError,  # Update after DSpace 8 migration
             errors.BitstreamOpenError,  # Update after DSpace 8 migration
             errors.BitstreamPostError,  # Update after DSpace 8 migration
         ) as e:
@@ -269,16 +268,14 @@ class Submission:
     ) -> DSpace6Item:
         """Add bitstreams to item from files in submission message."""
         logger.debug("Adding bitstreams to local item instance from submission message")
-        try:
-            for file in self.files or []:
-                bitstream = dspace.bitstream.Bitstream(
-                    file_path=file["FileLocation"],
-                    name=file["BitstreamName"],
-                    description=file.get("BitstreamDescription"),
-                )
-                item.bitstreams.append(bitstream)
-        except KeyError as e:
-            raise errors.BitstreamAddError from e
+
+        for file in self.files or []:
+            bitstream = dspace.bitstream.Bitstream(
+                file_path=file["FileLocation"],
+                name=file["BitstreamName"],
+                description=file.get("BitstreamDescription"),
+            )
+            item.bitstreams.append(bitstream)
         return item
 
     def _post_item_dspace6(  # Update after DSpace 8 migration
