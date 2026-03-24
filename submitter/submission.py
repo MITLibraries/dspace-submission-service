@@ -19,6 +19,7 @@ from dspace.item import Item as DSpace6Item  # Update after DSpace 8 migration
 from dspace_rest_client.client import (
     DSpaceClient as DSpace8Client,
 )  # Update after DSpace 8 migration
+from dspace_rest_client.models import Bitstream as DSpace8Bitstream
 from dspace_rest_client.models import (
     Bundle as DSpace8Bundle,
 )  # Update after DSpace 8 migration
@@ -189,15 +190,23 @@ class Submission:
 
     @classmethod
     def from_message(cls, message: "Message") -> "Submission":
-        """
-        Create a submission with all necessary publishing data from a submit message.
+        """Create a submission with all required data from a submission message.
+
+        The SQS message is validated via two JSONSchema files, one for the message
+        attributes and one for the message body.  If the message ATTRIBUTES fail
+        validation, the job is killed immediately via the raised
+        errors.SubmissionMessageBodyValidationError exception.  This bubbles up to
+        the calling sqs.process() context because we cannot confidently remove the
+        item from the input queue, which is because we cannot send an
+        error result to the output queue.  By contrast, if only the message BODY
+        fails validation, an error result is sent to the output queue,
+        and the overall job continues.
 
         Args:
             message: An SQS message
 
         Raises:
             SubmissionMessageAttributesValidationError
-            SubmissionMessageBodyValidationError
         """
         try:
             message_attributes, message_body = validate_message(message)
@@ -327,11 +336,23 @@ class Submission:
                 ) from e
 
     def _submit_item_dspace8(self) -> tuple[DSpace8Item, DSpace8Bundle]:
-        """Submit item instance from submission message."""
-        item = self._create_item_dspace8()
-        bundle = self._create_bundle_dspace8(item)
-        for bitstream_uri in self.files or []:
-            self._create_bitstream_dspace8(item, bundle, bitstream_uri)
+        """Submit item instance from submission message.
+
+        This method can handle either item 'create' or 'update' operations,
+        which is indicated by self.operation. While this method raises a
+        SubmissionError in the event of an invalid value for self.operation,
+        if Submission is instantiated using from_message(), any invalid values
+        would have been captured by JSON schema validation beforehand.
+        """
+        if self.operation == "update":
+            item, bundle = self._update_item_dspace8()
+        elif self.operation == "create":
+            item = self._create_item_dspace8()
+            bundle = self._create_bundle_dspace8(item)
+            for bitstream_uri in self.files or []:
+                self._create_bitstream_dspace8(item, bundle, bitstream_uri)
+        else:
+            raise errors.SubmissionError(f"Operation not recognized: {self.operation}")
         return item, bundle
 
     def _create_item_dspace8(self) -> DSpace8Item:
@@ -458,6 +479,146 @@ class Submission:
             )
 
         logger.info(f"Bitstream created with UUID: {bitstream.uuid}")
+
+    def _update_item_dspace8(self) -> tuple[DSpace8Item, DSpace8Bundle]:
+        """Update item in DSpace"""
+        if not self.item_handle:
+            raise errors.ItemError(
+                "The 'item_handle' attribute must be a non-empty string"
+            )
+
+        item = self.client.resolve_identifier_to_dso(identifier=self.item_handle)
+        if not item:
+            raise errors.DSpaceObjectNotFoundError(self.item_handle)
+        item = DSpace8Item(dso=item)  # need to cast to DSpace 8 item
+
+        logger.debug(
+            "At this time, the 'update' operation only updates bitstreams "
+            "and adding metadata fields related to bitstream update!"
+        )
+        bundle = self._update_bitstream_dspace8(item)
+        return item, bundle
+
+    def _update_bitstream_dspace8(self, item: DSpace8Item) -> DSpace8Bundle:
+        """Update bitstreams for an item in DSpace.
+
+        This method updates the 'ORIGINAL' bundle for an item, which is
+        understood to be the container for its bitstreams. This method will
+        retrieve the 'ORIGINAL' bundle, delete existing bitstreams, and
+        create new bitstreams from the 'Files' provided in the submission
+        message body. This results in a full replacement of the item's bitstreams.
+
+        NOTE: At this time, DSS will only update items with a single bitstream
+        in their 'ORIGINAL' bundle.
+        """
+        if not self.files:
+            raise errors.ItemError("The 'files' attribute cannot be empty")
+
+        # get update date and timestamp
+        time = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        # track bitstreams deleted and added to Item
+        deleted_bitstreams = []
+        added_bitstreams = []
+
+        # messages for dc.description.provenance
+        update_messages = []
+
+        bundle = self._get_original_bundle(item)
+        if not bundle:
+            raise errors.ItemError(
+                f"Item {item.handle} does not have an 'ORIGINAL' bundle"
+            )
+
+        bitstreams = self.client.get_bitstreams(bundle=bundle)
+        if len(bitstreams) == 0 or len(bitstreams) > 1:
+            raise errors.ItemError(
+                f"Error occurred while updating item '{item.handle}, 'ORIGINAL' "
+                f"bundle {bundle.uuid} contains {len(bitstreams)} bitstream(s)"
+            )
+
+        original_bitstream = bitstreams[0]  # retrieve single bitstream
+        self._delete_bitstream_dspace8(original_bitstream)
+        deleted_bitstreams.append(original_bitstream.name)
+
+        # note deleted bitstreams
+        update_messages.append(
+            "Full replacement of bitstreams for bundle 'ORIGINAL'."
+            f"The following bitstreams were removed: {deleted_bitstreams}."
+        )
+
+        # update 'ORIGINAL' bundle with new bitstreams
+        for bitstream_uri in self.files:
+            # create bitstream
+            try:
+                bitstream = self.client.create_bitstream(
+                    bundle=bundle,
+                    name=os.path.basename(bitstream_uri["BitstreamName"]),
+                    path=bitstream_uri["FileLocation"],
+                )
+            except Exception as e:
+                logger.exception("Error creating bitstream:")
+                raise errors.BitstreamError(
+                    message=(
+                        "Error occurred while creating bitstream from file "
+                        f"'{bitstream_uri["BitstreamName"]}' for item '{item.handle}'"
+                    ),
+                    exception=e,
+                ) from e
+            added_bitstreams.append(bitstream.name)
+
+        # note added bitstreams
+        update_messages.append(
+            f"The following bitstreams were added: {added_bitstreams}."
+        )
+
+        # add dc.description.provenance for updated bitstreams
+        update_messages.append(f"Updated on {time}")
+        self.client.add_metadata(
+            item, field="dc.description.provenance", value=" ".join(update_messages)
+        )
+        return bundle
+
+    def _get_original_bundle(self, item: DSpace8Item) -> DSpace8Bundle | None:
+        for bundle in self.client.get_bundles_iter(parent=item):
+            if bundle.name == "ORIGINAL":
+                return bundle
+        return None
+
+    def _delete_bitstream_dspace8(self, bitstream: DSpace8Bitstream) -> None:
+        """Delete Bitstream object.
+
+        # NOTE: This code was pulled from dspace-rest-python's (v0.1.17)
+        # client.delete_dso method, which only supports deletion of SimpleDSpaceObject's,
+        # which does not include the Bitstream object. This is a temporary workaround
+        # until the client is updated or we find an alternative way to send requests
+        # to DSpace REST API.
+        """
+        try:
+            bitstream_url = bitstream.links["self"]["href"]
+            response = self.client.api_delete(url=bitstream_url, params=None)
+        except ValueError as e:
+            raise errors.BitstreamError(
+                message=(f"Error occurred while deleting bitstream {bitstream.uuid}"),
+                exception=e,
+            ) from e
+
+        # TODO: This check is added to raise an exception if
+        # response.status_code is not equal to 204 (No Content).
+        # Should be updated if/when dspace-rest-python is
+        # updated to raise exceptions.
+        if response.status_code == 204:  # noqa: PLR2004
+            logger.info(
+                f"Bitstream '{bitstream.name}' (uuid={bitstream.uuid}) "
+                "deleted from DSpace"
+            )
+        else:
+            raise errors.BitstreamError(
+                message=(
+                    f"Error occurred while deleting bitstream {bitstream.uuid}: "
+                    f"{response.status_code} {response.text}"
+                )
+            )
 
     def result_error_message(
         self, message: str, dspace_response: str | None = None
