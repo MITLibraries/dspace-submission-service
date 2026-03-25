@@ -129,7 +129,14 @@ def test_submission_from_message_dspace8_success(
     assert submission.result_queue == "empty_result_queue"
 
 
-def test_submission_from_message_handles_message_body_jsondecodeerror(
+def test_submission_from_message_defaults_to_create_operation(input_message_good_dspace8):
+    submission = Submission.from_message(input_message_good_dspace8)
+
+    assert "Operation" not in input_message_good_dspace8.body
+    assert submission.operation == "create"
+
+
+def test_submission_from_message_body_jsondecodeerror_handled(
     input_message_invalid_json, mocked_dspace
 ):
     submission = Submission.from_message(input_message_invalid_json)
@@ -139,14 +146,14 @@ def test_submission_from_message_handles_message_body_jsondecodeerror(
     )
 
 
-def test_submission_from_message_handles_message_body_validationerror(
+def test_submission_from_message_body_missing_required_property_is_handled(
     input_message_missing_collection_handle,
 ):
     submission = Submission.from_message(input_message_missing_collection_handle)
     assert "'CollectionHandle' is a required property" in submission.result_message
 
 
-def test_submission_from_message_invalid_queue_raises_message_attr_validationerror(
+def test_submission_from_message_attr_invalid_queue_raises_validationerror(
     input_message_invalid_queue, mocked_dspace
 ):
     with pytest.raises(
@@ -156,7 +163,7 @@ def test_submission_from_message_invalid_queue_raises_message_attr_validationerr
         Submission.from_message(input_message_invalid_queue)
 
 
-def test_submission_from_message_missing_required_raises_message_attr_validationerror(
+def test_submission_from_message_attr_missing_required_property_raises_validationerror(
     input_message_missing_attribute,
 ):
     with pytest.raises(
