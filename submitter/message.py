@@ -1,5 +1,74 @@
 import json
+import logging
 from collections.abc import Iterator
+from functools import lru_cache
+from typing import TYPE_CHECKING
+
+import jsonschema
+
+if TYPE_CHECKING:
+    from mypy_boto3_sqs.service_resource import Message
+
+from submitter import errors
+from submitter.config import Config
+
+logger = logging.getLogger(__name__)
+CONFIG = Config()
+
+
+@lru_cache
+def load_jsonschemas() -> dict:
+    """Load SQS message attributes and body JSON Schema docs."""
+    logger.debug("Loading JSON schemas to cache")
+
+    # load SQS message attributes validation schema
+    with open("submitter/schemas/submission-message-attributes.json") as file:
+        attributes_schema = json.load(file)
+        # set constraint on "OutputQueue" using CONFIG
+        attributes_schema["properties"]["OutputQueue"]["properties"]["StringValue"][
+            "enum"
+        ] = CONFIG.output_queues
+
+    # load SQS message body validation schema
+    with open("submitter/schemas/submission-message-body.json") as file:
+        body_schema = json.load(file)
+
+    return {
+        "submission-message-attributes": attributes_schema,
+        "submission-message-body": body_schema,
+    }
+
+
+def validate_message(message: "Message") -> tuple[dict, dict]:
+    schemas = load_jsonschemas()
+
+    # validate message attributes
+    try:
+        jsonschema.validate(
+            instance=message.message_attributes,
+            schema=schemas["submission-message-attributes"],
+        )
+    except jsonschema.ValidationError as exception:
+        raise errors.SubmissionMessageAttributesValidationError(
+            exception.message
+        ) from exception
+
+    # parse and validate message body JSON string
+    try:
+        body = json.loads(message.body)
+        jsonschema.validate(instance=body, schema=schemas["submission-message-body"])
+    except json.JSONDecodeError as exception:
+        error_message = (
+            "Unable to parse submission message body. Message "
+            f"body provided was: '{message.body}'"
+        )
+        raise errors.SubmissionMessageBodyValidationError(error_message) from exception
+    except jsonschema.ValidationError as exception:
+        raise errors.SubmissionMessageBodyValidationError(
+            exception.message
+        ) from exception
+
+    return message.message_attributes, body
 
 
 def generate_submission_messages_from_file(

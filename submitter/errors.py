@@ -117,20 +117,6 @@ class ItemPostError(Exception):  # Update after DSpace 8 migration
         self.dspace_error = source_error.response.text if source_error.response else None
 
 
-class BitstreamAddError(Exception):  # Update after DSpace 8 migration
-    """Exception raised when adding bitstream objects to an item instance.
-
-    Attributes:
-        message (str): Explanation of the error
-    """
-
-    def __init__(self) -> None:
-        self.message = (
-            "Error occurred while parsing bitstream information from files listed in "
-            "submission message."
-        )
-
-
 class BitstreamOpenError(Exception):  # Update after DSpace 8 migration
     """Exception raised when opening a file to post as a bitstream to DSpace.
 
@@ -258,42 +244,10 @@ class SQSMessageSendError(Exception):
         )
 
 
-class SubmitMessageInvalidResultQueueError(Exception):
-    """Exception raised due to an invalid result queue name in a submission message.
-
-    Args:
-        message_id: The SQS message ID of the message causing the error
-        result_queue: The provided result queue name that caused the error
-
-    Attributes:
-        message(str): Explanation of the error
-    """
-
-    def __init__(self, message_id: str, result_queue: str | None):
-        self.message = (
-            "Aborting DSS processing due to a non-recoverable error:\nError occurred "
-            f"while processing message '{message_id}' from input queue "
-            f"'{CONFIG.input_queue}'. Message provided invalid result queue name "
-            f"'{result_queue}'. Valid result queue names are: "
-            f"{CONFIG.output_queues}."
-        )
+# Submission message validation errors
+class SubmissionMessageAttributesValidationError(Exception):
+    """Exception raised due when submission message attributes are invalid"""
 
 
-class SubmitMessageMissingAttributeError(Exception):
-    """Exception raised due to a missing required attribute in a submission message.
-
-    Args:
-        message_id: The SQS message ID of the message causing the error
-        attribute_name: The name of the attribute missing from the message
-
-    Attributes:
-        message(str): Explanation of the error
-    """
-
-    def __init__(self, message_id: str, attribute_name: str):
-        self.message = (
-            "Aborting DSS processing due to a non-recoverable error:\nError occurred "
-            f"while processing message '{message_id}' from input queue "
-            f"'{CONFIG.input_queue}'. Message was missing required attribute "
-            f"'{attribute_name}'."
-        )
+class SubmissionMessageBodyValidationError(Exception):
+    """Exception raised due when submission message body is invalid"""
