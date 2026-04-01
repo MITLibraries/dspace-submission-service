@@ -16,11 +16,13 @@ help: # Preview Makefile commands
 	@awk 'BEGIN { FS = ":.*#"; print "Usage:  make <target>\n\nTargets:" } \
 /^[-_[:alpha:]]+:.?*#/ { printf "  %-15s%s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
+.PHONY: help install venv update test coveralls lint lint-fix security
+
 ##############################################
 # Python Environment and Dependency commands
 ##############################################
 
-install: .venv .git/hooks/pre-commit # Install Python dependencies and create virtual environment if not exists
+install: .venv .git/hooks/pre-commit .git/hooks/pre-push # Install Python dependencies and create virtual environment if not exists
 	uv sync --dev
 
 .venv: # Creates virtual environment if not found
@@ -28,8 +30,12 @@ install: .venv .git/hooks/pre-commit # Install Python dependencies and create vi
 	uv venv .venv
 
 .git/hooks/pre-commit: # Sets up pre-commit hook if not setup
-	@echo "Installing pre-commit hooks..."
-	uv run pre-commit install
+	@echo "Installing pre-commit commit hooks..."
+	uv run pre-commit install --hook-type pre-commit
+
+.git/hooks/pre-push: # Sets up pre-push hook if not setup
+	@echo "Installing pre-commit push hooks..."
+	uv run pre-commit install --hook-type pre-push
 
 venv: .venv # Create the Python virtual environment
 
@@ -50,30 +56,20 @@ coveralls: test # Write coverage data to an LCOV report
 
 
 ####################################
-# Code quality and safety commands
+# Code linting and formatting
 ####################################
 
-lint: black mypy ruff safety # Run linters
-
-black: # Run 'black' linter and print a preview of suggested changes
-	uv run black --check --diff .
-
-mypy: # Run 'mypy' linter
+lint: # Run linting, alerts only, no code changes
+	uv run ruff format --diff
 	uv run mypy .
-
-ruff: # Run 'ruff' linter and print a preview of errors
 	uv run ruff check .
 
-safety: # Check for security vulnerabilities
-	uv run pip-audit --ignore-vuln CVE-2026-4539
-
-lint-apply: black-apply ruff-apply # Apply changes with 'black' and resolve 'fixable errors' with 'ruff'
-
-black-apply: # Apply changes with 'black'
-	uv run black .
-
-ruff-apply: # Resolve 'fixable errors' with 'ruff'
+lint-fix: # Run linting, auto fix behaviors where supported
+	uv run ruff format .
 	uv run ruff check --fix .
+
+security: # Run security / vulnerability checks
+	uv run pip-audit
 
 run-dev:  ## Runs the task in dev - see readme for more info
 	aws ecs run-task --cluster dso-ecs-dev --task-definition dso-dss-dev --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1

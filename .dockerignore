@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Python
+*.py[cod]
+__pycache__/
+*.egg-info/
+.venv/
+
+# Test and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docs
+docs/
+
+# CI
+.github/
+
+# Project-specific
+.arch_tag
+Makefile
+README.md

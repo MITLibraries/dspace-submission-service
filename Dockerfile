@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS build
+FROM python:3.13-slim AS build
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y git
 
