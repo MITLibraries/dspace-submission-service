@@ -62,10 +62,15 @@ processing messages from the submit queue.
 
 ```
 MessageBody = {
+    "Operation": "Optional - item operation to perform [create, update]. 
+        If this field is omitted, defaults to 'create' operation."
     "SubmissionSystem": "Required - specific system to submit to, e.g.
         'DSpace@MIT'",
-    "CollectionHandle": "Required - handle for DSpace Collection to post item
-        to, e.g. '1721.1/123456'",
+    "CollectionHandle": "Optional - handle for DSpace Collection to post item
+        to, e.g. '1721.1/123456'. This field is required when creating an 
+        item in DSpace.
+    "ItemHandle": "Optional - handle for DSpace Item to update. This field
+        is required when updating an existing item."
     "MetadataLocation": "Required - S3 URI for item metadata JSON file, e.g.
         'S3://bucket/metadata_file.json>'",
     "Files": [
@@ -92,6 +97,8 @@ MessageBody = {
     ]
 }
 ```
+
+**⚠️ Warning:**  The `update` operation currently only supports DSpace items with a single bitstream in the `ORIGINAL` bundle. Using `update` will remove that bitstream from the item and replace it with the bitstreams indicated in the "Files" field of the submission message.
 
 ## Example Submission Message
 
