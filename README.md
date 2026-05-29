@@ -3,28 +3,32 @@
 A service for creating DSpace records and attaching metadata
 and bitstreams. 
 
-This application will read from input queues, create DSpace records, submit the records to DSpace instances, and write the submission results to output queues.
+DSpace Submission Service (DSS) is a Python CLI application for ingesting items into DSpace.
 
-The app was originally oriented to submit to a single DSpace instance but in February 2026, it was updated to submit to multiple DSpace instances within a single submission run.
+This app consumes submission messages from designated input queues, which must be formatted according to the [Submission Message Specification](https://github.com/MITLibraries/dspace-submission-service/pull/docs/specifications/submission-message-specification.md). The content of the submission message tells the app where to find bitstreams and metadata for an [item](https://github.com/DSpace/RestContract/blob/main/items.md). This data is used to prepare an item that can be submitted to DSpace via the REST API. After sending a request to DSpace, DSS will write a result message to an output queue assigned to the submission source (see also [Result Message Specification](https://github.com/MITLibraries/dspace-submission-service/pull/docs/specifications/result-message-specification.md)).
+
+The app originally only supported submissions to a single DSpace instance but as of February 2026, it supports submissions to multiple DSpace instances after updates to the environment variables and client instantiation methods.
 
 
 ## Development
 
-Clone the repo and install the dependencies using `make install`:
+* To preview a list of available Makefile commands: `make help`
+* To install with dev dependencies: `make install`
+* To update dependencies: `make update`
+* To run unit tests: `make test`
+* To lint the repo: `make lint`
+* To run the app:
+ * `uv run submitter start --queue <input-queue>`
+    * requires activated project uv python environment
+    * utilizes uv built entrypoint (see project.scripts in pyproject.toml)
+    * does not support loading a .env file
+  * `uv run --env-file .env submitter start --queue <input-queue>`
+    * More verbose but supports loading a .env file
 
-```bash
-git clone git@github.com:MITLibraries/dspace-submission-service.git
-cd dspace-submission-service
-make install
-uv run submitter --help
-```
-
-The [Click documentation](https://click.palletsprojects.com/en/8.0.x/quickstart/)
-will be helpful to understand how to create and run commands.
 
 ### Using Moto for local SQS queues
 
-It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode(https://github.com/spulec/moto#stand-alone-server-mode)] rather than using true AWS SQS queues.
+It is often desireable to use [Moto](https://github.com/spulec/moto) for local development using the [Standalone Server Mode](https://github.com/spulec/moto#stand-alone-server-mode) rather than using true AWS SQS queues.
 
 To use, start moto running sqs in standalone mode with `uv run moto_server`, then:
 
@@ -99,8 +103,7 @@ The commands are produced by the Terraform used to create the infrastructure and
 
 ```shell
 WORKSPACE=#Set to `dev` for local development, this will be set to `stage` and `prod` in those environments by Terraform.
-DSS_DSPACE_CREDENTIALS=#A JSON string containing credentials for all supported DSpace instances. Each entry requires 'url', 'user', and 'password' fields. Example: 
-#{"ir-6":{"url":"...","user":"...","password":"..."},"ddc-6":{...},"ir-8":{...},"ddc-8":{...}}
+DSS_DSPACE_CREDENTIALS=#A JSON string containing credentials for all supported DSpace instances. Each entry requires 'url', 'user', and 'password' fields. Example: {"ir-6":{"url":"...","user":"...","password":"..."},"ddc-6":{...},"ir-8":{...},"ddc-8":{...}}
 INPUT_QUEUE=#Input message queue to use for development (see section below on using Moto for local SQS queues).
 OUTPUT_QUEUES=#Comma-separated string representing a list of valid output queues.
 ```
