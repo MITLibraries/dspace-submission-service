@@ -1,10 +1,12 @@
 # DSpace Submission Service
 
 A service for creating DSpace records and attaching metadata
-and bitstreams.
+and bitstreams. 
 
-This application will read from input queues, create DSpace records, and write
-results to output queues.
+This application will read from input queues, create DSpace records, submit the records to DSpace instances, and write the submission results to output queues.
+
+The app was originally oriented to submit to a single DSpace instance but in February 2026, it was updated to submit to multiple DSpace instances within a single submission run.
+
 
 ## Development
 
@@ -39,24 +41,36 @@ If you are just interested in testing SQS aspects of the application, you can by
 DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env`
 file.
 
-For local development, the default request timeout for requests sent to the DSpace API
-is 120 seconds due to slow response times from our test DSpace instance. However, this
-can make troubleshooting the DSpace connection tricky. To set a shorter (or longer if
-needed) timeout, add `DSPACE_TIMEOUT=<seconds as a float, e.g. 2.0>` to your `.env`
-file.
+The application supports submission to both DSpace 6 and DSpace 8 instances. For local development, the default request timeout for requests sent to the DSpace API
+is 180 seconds. To set adjust the timeout, set `DSPACE_TIMEOUT=<seconds as a float, e.g. 30.0>` in your `.env` file.
 
 ## Sample Data
 
-`uv run submitter load-sample-data -i=YOUR_INPUT_QUEUE -o=YOUR_OUTPUT_QUEUE` will
-load some sample data into the SQS input queue. If you want to load data for
-integration testing with DSpace test, add an additional option to the command:
-`-f tests/fixtures/integration-test-submission-messages.json`.
+Load sample input data:
+```bash
+uv run submitter load-sample-input-data -i=YOUR_INPUT_QUEUE -o=YOUR_OUTPUT_QUEUE -f <sample data filepath>
+```
+
+For integration testing with DSpace test server, use:
+```bash
+uv run submitter load-sample-input-data -i=YOUR_INPUT_QUEUE -o=YOUR_OUTPUT_QUEUE -f tests/fixtures/integration-test-submission-messages.json
+```
+
+You can also load sample output data:
+```bash
+uv run submitter load-sample-output-data -o=YOUR_OUTPUT_QUEUE -f <sample data filepath>
+```
 
 Warning: please do not run this against the production system or a bunch of junk records
-will load into dspace
+will load into DSpace
 
 ## Verifying DSpace connection
-To verify that DSS can connect to the DSpace REST API, run `make verify-dspace-connection` and view the logs to see if the connection was successful or failed.
+
+To verify that DSS can connect to a DSpace instance, run:
+
+```bash
+uv run submitter verify-dspace-connection --submission-system=<SUBMISSION_SYSTEM>
+```
 
 ## Processing
 
@@ -85,8 +99,9 @@ The commands are produced by the Terraform used to create the infrastructure and
 
 ```shell
 WORKSPACE=#Set to `dev` for local development, this will be set to `stage` and `prod` in those environments by Terraform.
-DSS_DSPACE_CREDENTIALS=#A collection of DSpace credentials formatted as a JSON string, where the key is a short name for a DSpace repository indicated in submission messages and values are credentials for a user account with keys for url, user, and password.
-INPUT_QUEUE=#Input message queue to use for development (see section below on using Moto for local SQS queues)
+DSS_DSPACE_CREDENTIALS=#A JSON string containing credentials for all supported DSpace instances. Each entry requires 'url', 'user', and 'password' fields. Example: 
+#{"ir-6":{"url":"...","user":"...","password":"..."},"ddc-6":{...},"ir-8":{...},"ddc-8":{...}}
+INPUT_QUEUE=#Input message queue to use for development (see section below on using Moto for local SQS queues).
 OUTPUT_QUEUES=#Comma-separated string representing a list of valid output queues.
 ```
 

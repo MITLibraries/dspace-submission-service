@@ -78,20 +78,11 @@ ruff-apply: # Resolve 'fixable errors' with 'ruff'
 run-dev:  ## Runs the task in dev - see readme for more info
 	aws ecs run-task --cluster dso-ecs-dev --task-definition dso-dss-dev --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
 
-verify-dspace-connection-dev: # Verify dev app can connect to DSpace
-	aws ecs run-task --cluster dso-ecs-dev --task-definition dso-dss-dev --network-configuration "awsvpcConfiguration={subnets=[subnet-0488e4996ddc8365b,subnet-022e9ea19f5f93e65],securityGroups=[sg-044033bf5f102c544],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "dso-dss-dev", "command": ["verify-dspace-connection"]}]}'
-
 run-stage:  ## Runs the task in stage - see readme for more info
 	aws ecs run-task --cluster dso-ecs-stage --task-definition dso-dss-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
 
-verify-dspace-connection-stage: # Verify stage app can connect to DSpace
-	aws ecs run-task --cluster dso-ecs-stage --task-definition dso-dss-stage --network-configuration "awsvpcConfiguration={subnets=[subnet-05df31ac28dd1a4b0,subnet-04cfa272d4f41dc8a],securityGroups=[sg-0f64d9a1101d544d1],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "dso-dss-stage", "command": ["verify-dspace-connection"]}]}'
-
 run-prod:  ## Runs the task in prod - see readme for more info
 	aws ecs run-task --cluster dso-ecs-prod --task-definition dso-dss-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-042726f373a7c5a79,subnet-05ab0e5c2bfcd748f],securityGroups=[sg-0325d8c490a870a90],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1
-
-verify-dspace-connection-prod: # Verify prod app can connect to DSpace
-	aws ecs run-task --cluster dso-ecs-prod --task-definition dso-dss-prod --network-configuration "awsvpcConfiguration={subnets=[subnet-042726f373a7c5a79,subnet-05ab0e5c2bfcd748f],securityGroups=[sg-0325d8c490a870a90],assignPublicIp=DISABLED}" --launch-type FARGATE --region us-east-1 --overrides '{"containerOverrides": [ {"name": "dso-dss-prod", "command": ["verify-dspace-connection"]}]}'
 
 ### Terraform-generated Developer Deploy Commands for Dev environment ###
 check-arch:
