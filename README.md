@@ -7,8 +7,6 @@ DSpace Submission Service (DSS) is a Python CLI application for ingesting items 
 
 This app consumes submission messages from designated input queues, which must be formatted according to the [Submission Message Specification](https://github.com/MITLibraries/dspace-submission-service/pull/docs/specifications/submission-message-specification.md). The content of the submission message tells the app where to find bitstreams and metadata for an [item](https://github.com/DSpace/RestContract/blob/main/items.md). This data is used to prepare an item that can be submitted to DSpace via the REST API. After sending a request to DSpace, DSS will write a result message to an output queue assigned to the submission source (see also [Result Message Specification](https://github.com/MITLibraries/dspace-submission-service/pull/docs/specifications/result-message-specification.md)).
 
-The app originally only supported submissions to a single DSpace instance but as of February 2026, it supports submissions to multiple DSpace instances after updates to the environment variables and client instantiation methods.
-
 
 ## Development
 
@@ -33,9 +31,9 @@ It is often desireable to use [Moto](https://github.com/spulec/moto) for local d
 To use, start moto running sqs in standalone mode with `uv run moto_server`, then:
 
 - add `SQS_ENDPOINT_URL='http://localhost:5000'` to your `.env` file
-- create the queues you'd like to use
-  - uv run submitter create-queue YOUR_INPUT_QUEUE
-  - uv run submitter create-queue YOUR_OUTPUT_QUEUE
+- create the queues you'd like to use:
+  - `uv run submitter create-queue <input-queue>`
+  - `uv run submitter create-queue <output-queue>`
 
 While this provides local SQS queues, please note it does not provide local DSpace so you currently still need to use the test server and real credentials.
 
