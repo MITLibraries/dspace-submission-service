@@ -83,7 +83,7 @@ def test_verify_connection_dspace6_success(mocked_dspace, caplog):
             [
                 "verify-dspace-connection",
                 "--submission-system",
-                "DSpace@MIT",
+                "DDC-6",
             ],
         )
         assert result.exit_code == 0

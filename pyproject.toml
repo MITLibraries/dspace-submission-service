@@ -53,7 +53,7 @@ ignore_missing_imports = true
 
 [tool.uv]
 package = true
-override-dependencies = ["smart_open>=7.0.0"]
+override-dependencies = ["smart_open>=7.0.0", "requests>=2.34.0"]
 
 [[tool.uv.index]]
 name = "pypi"

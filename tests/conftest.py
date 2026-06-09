@@ -211,7 +211,7 @@ def mocked_sqs(aws_credentials):
                 MessageAttributes=test_attributes,
                 MessageBody=json.dumps(
                     {
-                        "SubmissionSystem": "DSpace@MIT",
+                        "SubmissionSystem": "DDC-6",
                         "CollectionHandle": "0000/collection01",
                         "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                         "Files": [
@@ -300,7 +300,7 @@ def input_message_good_dspace6(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -346,7 +346,7 @@ def input_message_missing_collection_handle(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
                     {
@@ -411,7 +411,7 @@ def input_message_item_create_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata-error.json",
                 "Files": [
@@ -434,7 +434,7 @@ def input_message_bitstream_create_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -456,7 +456,7 @@ def input_message_item_post_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/not-a-collection",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -479,7 +479,7 @@ def input_message_item_post_dspace_timeout(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection03",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -502,7 +502,7 @@ def input_message_bitstream_file_open_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -530,7 +530,7 @@ def input_message_item_post_dspace_generic_500_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection04",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -553,7 +553,7 @@ def input_message_bitstream_dspace_post_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection02",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [

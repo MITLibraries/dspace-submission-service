@@ -83,7 +83,7 @@ class Config:
         """Return DSpace credentials for supported instances."""
         credentials = json.loads(self.dss_dspace_credentials)
         return {
-            "DSpace@MIT": credentials["ir-6"],
+            "DSpace@MIT": credentials["ir-8"],
             "IR-8": credentials["ir-8"],
             "DDC-6": credentials["ddc-6"],
             "DDC-8": credentials["ddc-8"],

@@ -24,18 +24,18 @@ def test_dspace_client_cache_stores_by_destination(
     assert dspace_clients == {}
     submission_dspace6 = Submission.from_message(input_message_good_dspace6)
     submission_dspace6.submit()
-    assert dspace_clients == {"DSpace@MIT": submission_dspace6.client}
+    assert dspace_clients == {"DDC-6": submission_dspace6.client}
     submission_dspace8 = Submission.from_message(input_message_good_dspace8)
     submission_dspace8.submit()
     assert dspace_clients == {
-        "DSpace@MIT": submission_dspace6.client,
+        "DDC-6": submission_dspace6.client,
         "IR-8": submission_dspace8.client,
     }
 
 
 def test_submission_get_dspace_client_dspace6_success(mocked_dspace):
     submission = Submission(
-        destination="DSpace@MIT",
+        destination="DDC-6",
         attributes=None,
         result_queue=None,
     )
@@ -89,7 +89,7 @@ def test_submission_from_message_dspace6_success(
     input_message_good_dspace6, mocked_dspace
 ):
     submission = Submission.from_message(input_message_good_dspace6)
-    assert submission.destination == "DSpace@MIT"
+    assert submission.destination == "DDC-6"
     assert submission.collection_handle == "0000/collection01"
     assert submission.metadata_location == "tests/fixtures/test-item-metadata.json"
     assert submission.files == [
@@ -175,7 +175,7 @@ def test_submission_from_message_attr_missing_required_property_raises_validatio
 
 def test_get_metadata_entries_from_file_dspace6(mocked_dspace):
     submission = Submission(
-        destination="DSpace@MIT",
+        destination="DDC-6",
         collection_handle=None,
         metadata_location="tests/fixtures/test-item-metadata.json",
         files=None,

@@ -93,13 +93,10 @@ class Submission:
             logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
         try:
-            if self.destination in [
-                "DSpace@MIT",
-                "DDC-6",
-            ]:  # Update after DSpace 8 migration
+            if self.destination == "DDC-6":  # Update after DSpace 8 migration
                 item = self._submit_item_dspace6()
                 self.result_success_message(item)
-            elif self.destination in ["IR-8", "DDC-8"]:
+            elif self.destination in ["DSpace@MIT", "IR-8", "DDC-8"]:
                 item, bundle = self._submit_item_dspace8()
                 self.result_success_message(item, bundle)
 
@@ -149,9 +146,9 @@ class Submission:
             credentials = CONFIG.dspace_credentials[destination]
         except KeyError as exc:
             raise errors.InvalidDSpaceDestinationError(destination) from exc
-        if destination in ["DSpace@MIT", "DDC-6"]:  # Update after DSpace 8 migration
+        if destination == "DDC-6":  # Update after DSpace 8 migration
             return self._create_dspace6_client(credentials)
-        elif destination in ["IR-8", "DDC-8"]:  # noqa: RET505
+        elif destination in ["DSpace@MIT", "IR-8", "DDC-8"]:  # noqa: RET505
             return self._create_dspace8_client(credentials)
         raise ValueError(f"Destination value not recognized: {destination}")
 
