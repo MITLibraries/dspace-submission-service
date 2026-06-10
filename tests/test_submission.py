@@ -53,6 +53,16 @@ def test_submission_get_dspace_client_dspace8_success(mocked_dspace):
     assert isinstance(dspace_client, DSpace8Client)
 
 
+def test_submission_get_dspace_client_dspace_mit_success(mocked_dspace):
+    submission = Submission(
+        destination="DSpace@MIT",
+        attributes=None,
+        result_queue=None,
+    )
+    dspace_client = submission.get_dspace_client()
+    assert isinstance(dspace_client, DSpace8Client)
+
+
 def test_submission_get_dspace_client_dspace8_no_auth_raises_error(
     mocked_dspace8_auth_failure,
 ):
@@ -112,6 +122,28 @@ def test_submission_from_message_dspace8_success(
 ):
     submission = Submission.from_message(input_message_good_dspace8)
     assert submission.destination == "IR-8"
+    assert submission.collection_handle == "0000/collection01"
+    assert submission.metadata_location == "tests/fixtures/test-item-metadata.json"
+    assert submission.files == [
+        {
+            "BitstreamName": "test-file-01.pdf",
+            "FileLocation": "tests/fixtures/test-file-01.pdf",
+            "BitstreamDescription": "A test bitstream",
+        }
+    ]
+    assert submission.result_attributes == {
+        "PackageID": {"DataType": "String", "StringValue": "etdtest01"},
+        "SubmissionSource": {"DataType": "String", "StringValue": "etd"},
+    }
+    assert submission.result_message is None
+    assert submission.result_queue == "empty_result_queue"
+
+
+def test_submission_from_message_dspace_mit_success(
+    input_message_good_dspace_mit, mocked_dspace
+):
+    submission = Submission.from_message(input_message_good_dspace_mit)
+    assert submission.destination == "DSpace@MIT"
     assert submission.collection_handle == "0000/collection01"
     assert submission.metadata_location == "tests/fixtures/test-item-metadata.json"
     assert submission.files == [
@@ -293,6 +325,15 @@ def test_submit_dspace8_success(mock_get_bitstreams, dspace8_submission_instance
     ]
     dspace8_submission_instance.submit()
     assert dspace8_submission_instance.result_message["ResultType"] == "success"
+
+
+@patch("submitter.submission.DSpace8Client.get_bitstreams")
+def test_submit_dspace_mit_success(mock_get_bitstreams, dspace_mit_submission_instance):
+    mock_get_bitstreams.return_value = [
+        DSpace8Bitstream({"uuid": "bitstream01", "bundleName": "bundle01"})
+    ]
+    dspace_mit_submission_instance.submit()
+    assert dspace_mit_submission_instance.result_message["ResultType"] == "success"
 
 
 @patch("submitter.submission.DSpace6Client")

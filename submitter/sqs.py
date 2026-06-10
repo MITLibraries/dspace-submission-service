@@ -43,7 +43,7 @@ def process(msgs: list["Message"]) -> None:
             "Processing message '%s' from queue '%s'", message_id, CONFIG.input_queue
         )
 
-        if CONFIG.skip_processing == "true":
+        if CONFIG.skip_processing:
             logger.info("Skipping processing due to config")
         else:
             submission = Submission.from_message(message)

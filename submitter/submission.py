@@ -88,9 +88,8 @@ class Submission:
                 it is re-raised with some useful message information and stops the
                 entire SQS message loop process until someone can investigate further.
         """
-        if CONFIG.skip_processing != "true":
-            self.client = self.get_dspace_client()
-            logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
+        self.client = self.get_dspace_client()
+        logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
         try:
             if self.destination == "DDC-6":  # Update after DSpace 8 migration
