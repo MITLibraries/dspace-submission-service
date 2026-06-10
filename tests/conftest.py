@@ -211,7 +211,7 @@ def mocked_sqs(aws_credentials):
                 MessageAttributes=test_attributes,
                 MessageBody=json.dumps(
                     {
-                        "SubmissionSystem": "DSpace@MIT",
+                        "SubmissionSystem": "DDC-6",
                         "CollectionHandle": "0000/collection01",
                         "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                         "Files": [
@@ -294,13 +294,38 @@ def dspace8_submission_instance(test_dspace8_client):
 
 
 @pytest.fixture
+def dspace_mit_submission_instance(test_dspace8_client):
+    submission = Submission(
+        destination="DSpace@MIT",
+        collection_handle="0000/collection01",
+        metadata_location="tests/fixtures/test-item-metadata.json",
+        files=[
+            {
+                "BitstreamName": "test-file-01.pdf",
+                "FileLocation": "tests/fixtures/test-file-01.pdf",
+                "BitstreamDescription": "A test bitstream",
+            },
+            {
+                "BitstreamName": "test-file-02.pdf",
+                "FileLocation": "tests/fixtures/test-file-01.pdf",
+                "BitstreamDescription": "Another test bitstream",
+            },
+        ],
+        result_queue=None,
+        attributes={},
+    )
+    submission.client = test_dspace8_client
+    return submission
+
+
+@pytest.fixture
 def input_message_good_dspace6(mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
     queue.send_message(
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -340,13 +365,36 @@ def input_message_good_dspace8(mocked_sqs):
 
 
 @pytest.fixture
-def input_message_missing_collection_handle(mocked_sqs):
+def input_message_good_dspace_mit(mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
     queue.send_message(
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
                 "SubmissionSystem": "DSpace@MIT",
+                "CollectionHandle": "0000/collection01",
+                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
+                "Files": [
+                    {
+                        "BitstreamName": "test-file-01.pdf",
+                        "FileLocation": "tests/fixtures/test-file-01.pdf",
+                        "BitstreamDescription": "A test bitstream",
+                    }
+                ],
+            }
+        ),
+    )
+    return queue.receive_messages(MessageAttributeNames=["All"])[0]
+
+
+@pytest.fixture
+def input_message_missing_collection_handle(mocked_sqs):
+    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
+    queue.send_message(
+        MessageAttributes=test_attributes,
+        MessageBody=json.dumps(
+            {
+                "SubmissionSystem": "DDC-6",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
                     {
@@ -411,7 +459,7 @@ def input_message_item_create_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata-error.json",
                 "Files": [
@@ -434,7 +482,7 @@ def input_message_bitstream_create_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -456,7 +504,7 @@ def input_message_item_post_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/not-a-collection",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -479,7 +527,7 @@ def input_message_item_post_dspace_timeout(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection03",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -502,7 +550,7 @@ def input_message_bitstream_file_open_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -530,7 +578,7 @@ def input_message_item_post_dspace_generic_500_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection04",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -553,7 +601,7 @@ def input_message_bitstream_dspace_post_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DSpace@MIT",
+                "SubmissionSystem": "DDC-6",
                 "CollectionHandle": "0000/collection02",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -629,7 +677,7 @@ def test_env(monkeypatch):
     monkeypatch.setenv("OUTPUT_QUEUES", "empty_result_queue")
     monkeypatch.setenv("SENTRY_DSN", "https://1234567890@00000.ingest.sentry.io/123456")
     monkeypatch.setenv("DSPACE_TIMEOUT", "3")
-    monkeypatch.setenv("SKIP_PROCESSING", "true")
+    monkeypatch.setenv("SKIP_PROCESSING", "false")
     monkeypatch.setenv("SQS_ENDPOINT_URL", "https://sqs.us-east-1.amazonaws.com/")
 
 
