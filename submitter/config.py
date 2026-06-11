@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class Config:
-
     REQUIRED_ENV_VARS = (
         "WORKSPACE",
         "DSS_DSPACE_CREDENTIALS",
