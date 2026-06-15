@@ -19,11 +19,17 @@
         },
         "CollectionHandle": {
             "description": "Handle for DSpace Collection for created items",
-            "type": "string"
+            "type": [
+                "string",
+                "null"
+            ]
         },
         "ItemHandle": {
             "description": "Handle for DSpace Item to be updated",
-            "type": "string"
+            "type": [
+                "string",
+                "null"
+            ]
         },
         "MetadataLocation": {
             "description": "S3 URI for item metadata JSON file",

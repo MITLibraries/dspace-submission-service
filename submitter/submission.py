@@ -36,9 +36,9 @@ logger = logging.getLogger(__name__)
 CONFIG = Config()
 
 # Shared cache for DSpace clients across all Submission instances
-dspace_clients: dict[str, DSpace6Client | DSpace8Client] = (
-    {}
-)  # Update after DSpace 8 migration
+dspace_clients: dict[
+    str, DSpace6Client | DSpace8Client
+] = {}  # Update after DSpace 8 migration
 
 
 class ValidItemOperations(StrEnum):
@@ -456,7 +456,7 @@ class Submission:
             raise errors.BitstreamError(
                 message=(
                     "Error occurred while creating bitstream from file "
-                    f"'{bitstream_data["BitstreamName"]}' for item '{item.handle}'"
+                    f"'{bitstream_data['BitstreamName']}' for item '{item.handle}'"
                 ),
                 exception=e,
             ) from e
@@ -470,7 +470,7 @@ class Submission:
             raise errors.BitstreamError(
                 message=(
                     "Error occurred while creating bitstream from file "
-                    f"'{bitstream_data["BitstreamName"]}' for item '{item.handle}'"
+                    f"'{bitstream_data['BitstreamName']}' for item '{item.handle}'"
                 ),
             )
 
@@ -557,7 +557,7 @@ class Submission:
                 raise errors.BitstreamError(
                     message=(
                         "Error occurred while creating bitstream from file "
-                        f"'{bitstream_uri["BitstreamName"]}' for item '{item.handle}'"
+                        f"'{bitstream_uri['BitstreamName']}' for item '{item.handle}'"
                     ),
                     exception=e,
                 ) from e

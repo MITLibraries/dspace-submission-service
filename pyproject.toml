@@ -1,12 +1,12 @@
 [project]
 name = "submitter"
 version = "1.2.3"
-requires-python = "~=3.12.0"
+requires-python = ">=3.13"
 dependencies = [
     "boto3",
     "click",
     "dspace-python-client",
-    "dspace-rest-client==0.1.16",
+    "dspace-rest-client>=0.1.17",
     "jsonschema",
     "sentry-sdk",
     "smart-open",
@@ -22,12 +22,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["submitter"]
 
-[tool.black]
-line-length = 90
-
 [dependency-groups]
 dev = [
-    "black",
     "boto3-stubs[essential]",
     "coverage",
     "coveralls",
@@ -69,7 +65,7 @@ env = [
 ]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 
 # set max line length
 line-length = 90
