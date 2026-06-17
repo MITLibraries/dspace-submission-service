@@ -483,10 +483,13 @@ class Submission:
                 "The 'item_handle' attribute must be a non-empty string"
             )
 
-        item = self.client.resolve_identifier_to_dso(identifier=self.item_handle)
-        if not item:
+        dspace_object = self.client.resolve_identifier_to_dso(identifier=self.item_handle)
+        if not dspace_object:
             raise errors.DSpaceObjectNotFoundError(self.item_handle)
-        item = DSpace8Item(dso=item)  # need to cast to DSpace 8 item
+        item = DSpace8Item(dso=dspace_object)  # need to cast to DSpace 8 item
+        item.links = (
+            dspace_object.links
+        )  # TODO: Remove temporary workaround after client update
 
         logger.debug(
             "At this time, the 'update' operation only updates bitstreams "
@@ -527,21 +530,23 @@ class Submission:
             )
 
         bitstreams = self.client.get_bitstreams(bundle=bundle)
-        if len(bitstreams) == 0 or len(bitstreams) > 1:
+        if len(bitstreams) == 1:
+            original_bitstream = bitstreams[0]  # retrieve single bitstream
+            self._delete_bitstream_dspace8(original_bitstream)
+            deleted_bitstreams.append(original_bitstream.name)
+
+            # note deleted bitstreams
+            update_messages.append(
+                "Full replacement of bitstreams for bundle 'ORIGINAL'."
+                f"The following bitstreams were removed: {deleted_bitstreams}."
+            )
+        elif len(bitstreams) == 0:
+            logger.warning(f"'ORIGINAL' bundle for item '{item.handle}' is empty")
+        elif len(bitstreams) > 1:
             raise errors.ItemError(
                 f"Error occurred while updating item '{item.handle}, 'ORIGINAL' "
                 f"bundle {bundle.uuid} contains {len(bitstreams)} bitstream(s)"
             )
-
-        original_bitstream = bitstreams[0]  # retrieve single bitstream
-        self._delete_bitstream_dspace8(original_bitstream)
-        deleted_bitstreams.append(original_bitstream.name)
-
-        # note deleted bitstreams
-        update_messages.append(
-            "Full replacement of bitstreams for bundle 'ORIGINAL'."
-            f"The following bitstreams were removed: {deleted_bitstreams}."
-        )
 
         # update 'ORIGINAL' bundle with new bitstreams
         for bitstream_uri in self.files:
