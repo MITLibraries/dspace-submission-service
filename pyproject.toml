@@ -6,7 +6,7 @@ dependencies = [
     "boto3",
     "click",
     "dspace-python-client",
-    "dspace-rest-client>=0.1.17",
+    "dspace-rest-client",
     "jsonschema",
     "sentry-sdk",
     "smart-open",
