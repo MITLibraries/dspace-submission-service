@@ -264,6 +264,10 @@ class Submission:
     def _get_metadata_entries_from_file_dspace6(  # Update after DSpace 8 migration
         self,
     ) -> Iterator[dict]:
+        if self.metadata_location is None:
+            raise errors.ItemError(
+                message="metadata_location is required for DSpace 6 item creation"
+            )
         with smart_open.open(self.metadata_location) as f:
             metadata = json.load(f)
         yield from metadata["metadata"]
@@ -366,6 +370,10 @@ class Submission:
         if self.collection_handle and not collection:
             raise errors.DSpaceObjectNotFoundError(identifier=self.collection_handle)
 
+        if self.metadata_location is None:
+            raise errors.ItemError(
+                message="metadata_location is required for DSpace 8 item creation"
+            )
         try:
             with smart_open.open(self.metadata_location, "r") as metadata:
                 item_data = {
@@ -487,9 +495,6 @@ class Submission:
         if not dspace_object:
             raise errors.DSpaceObjectNotFoundError(self.item_handle)
         item = DSpace8Item(dso=dspace_object)  # need to cast to DSpace 8 item
-        item.links = (
-            dspace_object.links
-        )  # TODO: Remove temporary workaround after client update
 
         logger.debug(
             "At this time, the 'update' operation only updates bitstreams "
