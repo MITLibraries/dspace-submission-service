@@ -115,10 +115,8 @@ def configure_logger(
         for name in warning_only_loggers:
             logging.getLogger(name).setLevel(logging.WARNING)
 
-    for handler in root_logger.handlers[:]:
-        if isinstance(handler, logging.StreamHandler):
-            handler.setFormatter(logging.Formatter(logging_format))
-            break
+    for handler in root_logger.handlers:
+        handler.setFormatter(logging.Formatter(logging_format))
 
     return (
         f"Logger '{root_logger.name}' configured with level="
