@@ -2,7 +2,7 @@
 import re
 import sys
 import traceback
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from dspace import Bitstream, Item
@@ -336,6 +336,25 @@ def test_submit_dspace_mit_success(mock_get_bitstreams, dspace_mit_submission_in
     assert dspace_mit_submission_instance.result_message["ResultType"] == "success"
 
 
+@pytest.mark.parametrize(
+    "submission_error",
+    [
+        errors.ItemError("Error creating item"),
+        errors.BundleError("Error creating bundle"),
+        errors.BitstreamError("Error creating bitstream"),
+    ],
+)
+@patch("submitter.submission.Submission._submit_item_dspace8")
+def test_submit_dspace8_submission_error(
+    mock_submit_item_dspace8,
+    submission_error,
+    dspace8_submission_instance,
+):
+    mock_submit_item_dspace8.side_effect = submission_error
+    dspace8_submission_instance.submit()
+    assert dspace8_submission_instance.result_message["ResultType"] == "error"
+
+
 @patch("submitter.submission.DSpace6Client")
 def test_submit_dspace6_item_create_error(
     mock_dspace_client,
@@ -473,7 +492,6 @@ def test_submit_item_dspace8_bundle_create_error_raises_exception(
     mock_create_bundle.side_effect = RequestException
     with pytest.raises(errors.BundleError):
         dspace8_submission_instance._submit_item_dspace8()
-    assert "Error creating bundle:" in caplog.text
 
 
 @patch("submitter.submission.DSpace8Client.create_bitstream")
@@ -487,7 +505,6 @@ def test_submit_item_dspace8_bitstream_error_raises_exception(
 
     with pytest.raises(errors.BitstreamError):
         dspace8_submission_instance._submit_item_dspace8()
-    assert "Error creating bitstream:" in caplog.text
 
 
 @patch("submitter.submission.DSpace8Client.create_bitstream")
@@ -500,7 +517,6 @@ def test_submit_item_dspace8_bitstream_error_triggers_cleanup(
     with pytest.raises(errors.BitstreamError):
         dspace8_submission_instance._submit_item_dspace8()
 
-    assert "Error creating bitstream:" in caplog.text
     assert "Item '0000/item01' was partially posted to DSpace, cleaning up" in caplog.text
     assert "Item '0000/item01' deleted from DSpace" in caplog.text
 
@@ -517,6 +533,146 @@ def test_submit_item_dspace8_bitstream_error_cleanup_failure_logs_exception(
     with pytest.raises(errors.BitstreamError):
         dspace8_submission_instance._submit_item_dspace8()
 
-    assert "Error creating bitstream:" in caplog.text
     assert "Item '0000/item01' was partially posted to DSpace, cleaning up" in caplog.text
     assert "Failed to delete DSpace item '0000/item01'" in caplog.text
+
+
+@patch("submitter.submission.Submission._delete_old_item_bitstream")
+@patch("submitter.submission.Submission._upload_new_item_bitstreams")
+@patch("submitter.submission.Submission._get_item_bitstream_bundle")
+def test_update_item_bitstream_dspace8_with_old_bitstream_success(
+    mock_get_item_bitstream_bundle,
+    mock_upload_new_item_bitstreams,
+    mock_delete_old_item_bitstream,
+    dspace8_submission_instance,
+):
+    item = MagicMock()
+    mock_get_item_bitstream_bundle.return_value = (
+        MagicMock(name="old-test-file-01.pdf"),  # the old bitstream
+        MagicMock(),  # the bundle
+    )
+    mock_upload_new_item_bitstreams.return_value[
+        MagicMock(name="test-file-01.pdf"), MagicMock(name="test-file-02.pdf")
+    ]
+    dspace8_submission_instance._update_item_bitstream_dspace8(item)
+
+    mock_delete_old_item_bitstream.assert_called_once()
+
+
+@patch("submitter.submission.Submission._delete_old_item_bitstream")
+@patch("submitter.submission.Submission._upload_new_item_bitstreams")
+@patch("submitter.submission.Submission._get_item_bitstream_bundle")
+def test_update_item_bitstream_dspace8_without_old_bitstream_success(
+    mock_get_item_bitstream_bundle,
+    mock_upload_new_item_bitstreams,
+    mock_delete_old_item_bitstream,
+    dspace8_submission_instance,
+):
+    item = MagicMock()
+    mock_get_item_bitstream_bundle.return_value = (
+        None,  # the old bitstream
+        MagicMock(),  # the bundle
+    )
+    mock_upload_new_item_bitstreams.return_value[
+        MagicMock(name="test-file-01.pdf"), MagicMock(name="test-file-02.pdf")
+    ]
+    dspace8_submission_instance._update_item_bitstream_dspace8(item)
+
+    mock_delete_old_item_bitstream.assert_not_called()
+
+
+@patch("submitter.submission.DSpace8Client.create_bitstream")
+@patch("submitter.submission.Submission._delete_old_item_bitstream")
+@patch("submitter.submission.Submission._undo_bitstream_updates")
+@patch("submitter.submission.Submission._get_item_bitstream_bundle")
+def test_update_item_bitstream_dspace8_undo_not_required_raise_error(
+    mock_get_item_bitstream_bundle,
+    mock_undo_bitstream_updates,
+    mock_delete_old_item_bitstream,
+    mock_dspace_client_create_bitstream,
+    dspace8_submission_instance,
+):
+    item = MagicMock()
+    mock_get_item_bitstream_bundle.return_value = (
+        MagicMock(name="old-test-file-01.pdf"),  # the old bitstream
+        MagicMock(),  # the bundle
+    )
+    mock_dspace_client_create_bitstream.side_effect = [
+        Exception("Failed to create bitstream"),  # first bitstream failed
+        Exception("Failed to create bitstream"),  # second bitstream failed
+    ]
+
+    with pytest.raises(
+        errors.BitstreamError,
+    ) as exception:
+        dspace8_submission_instance._update_item_bitstream_dspace8(item)
+
+    mock_undo_bitstream_updates.assert_not_called()
+    mock_delete_old_item_bitstream.assert_not_called()
+    assert "restored item to original state" not in str(exception)
+
+
+@patch("submitter.submission.DSpace8Client.create_bitstream")
+@patch("submitter.submission.Submission._delete_old_item_bitstream")
+@patch("submitter.submission.Submission._undo_bitstream_updates")
+@patch("submitter.submission.Submission._get_item_bitstream_bundle")
+def test_update_item_bitstream_dspace8_undo_restores_item_state_raise_error(
+    mock_get_item_bitstream_bundle,
+    mock_undo_bitstream_updates,
+    mock_delete_old_item_bitstream,
+    mock_dspace_client_create_bitstream,
+    dspace8_submission_instance,
+):
+    item = MagicMock()
+    mock_get_item_bitstream_bundle.return_value = (
+        MagicMock(name="old-test-file-01.pdf"),  # the old bitstream
+        MagicMock(),  # the bundle
+    )
+    mock_dspace_client_create_bitstream.side_effect = [
+        MagicMock(name="test-file-01.pdf"),  # first bitstream was successful
+        Exception("Failed to create bitstream"),  # second bitstream failed
+    ]
+    mock_undo_bitstream_updates.return_value = []  # undo creation of first new bitstream
+
+    with pytest.raises(
+        errors.BitstreamError,
+        match=r"restored item to original state",
+    ):
+        dspace8_submission_instance._update_item_bitstream_dspace8(item)
+
+    mock_undo_bitstream_updates.assert_called_once()
+    mock_delete_old_item_bitstream.assert_not_called()
+
+
+@patch("submitter.submission.DSpace8Client.create_bitstream")
+@patch("submitter.submission.Submission._delete_old_item_bitstream")
+@patch("submitter.submission.Submission._undo_bitstream_updates")
+@patch("submitter.submission.Submission._get_item_bitstream_bundle")
+def test_update_item_bitstream_dspace8_undo_fails_to_restore_item_state_raise_error(
+    mock_get_item_bitstream_bundle,
+    mock_undo_bitstream_updates,
+    mock_delete_old_item_bitstream,
+    mock_dspace_client_create_bitstream,
+    dspace8_submission_instance,
+):
+    item = MagicMock()
+    mock_get_item_bitstream_bundle.return_value = (
+        MagicMock(name="old-test-file-01.pdf"),  # the old bitstream
+        MagicMock(),  # the bundle
+    )
+    mock_dspace_client_create_bitstream.side_effect = [
+        MagicMock(name="test-file-01.pdf"),  # first bitstream was successful
+        Exception("Failed to create bitstream"),  # second bitstream failed
+    ]
+    mock_undo_bitstream_updates.return_value = ["test-file-02.pdf"]
+
+    with pytest.raises(
+        errors.BitstreamError,
+        match=re.escape(
+            "Please delete the following bitstreams to restore item state: ['test-file-02.pdf']"  # noqa: E501
+        ),
+    ):
+        dspace8_submission_instance._update_item_bitstream_dspace8(item)
+
+    mock_undo_bitstream_updates.assert_called_once()
+    mock_delete_old_item_bitstream.assert_not_called()

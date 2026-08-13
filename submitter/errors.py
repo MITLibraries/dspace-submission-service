@@ -25,12 +25,13 @@ class InvalidDSpaceDestinationError(Exception):
     """
 
     def __init__(self, destination: str | None):
-        self.message = f"Invalid DSpace destination specified: '{destination}'."
+        message = f"Invalid DSpace destination specified: '{destination}'."
+        super().__init__(message)
 
 
 class SubmissionError(Exception):
     def __init__(self, message: str, exception: Exception | None = None):
-        self.message = message
+        super().__init__(message)
         self.exception = exception
 
         if (
@@ -51,7 +52,8 @@ class DSpaceObjectNotFoundError(SubmissionError):
     """
 
     def __init__(self, identifier: str):
-        self.message = f"Did not find any DSpace objects associated with the identifier: '{identifier}'"  # noqa: E501
+        message = f"Did not find any DSpace objects associated with the identifier: '{identifier}'"  # noqa: E501
+        super(SubmissionError, self).__init__(message)
 
 
 class ItemError(SubmissionError):
@@ -110,10 +112,11 @@ class ItemPostError(Exception):  # Update after DSpace 8 migration
         source_error: RequestException,
         collection_handle: str | None,
     ):
-        self.message = (
+        message = (
             "Error occurred while posting item to DSpace collection "
             f"'{collection_handle}'"
         )
+        super().__init__(message)
         self.dspace_error = source_error.response.text if source_error.response else None
 
 
@@ -129,10 +132,11 @@ class BitstreamOpenError(Exception):  # Update after DSpace 8 migration
     """
 
     def __init__(self, file_path: str, item_handle: str):
-        self.message = (
+        message = (
             f"Error occurred while opening file '{file_path}' for bitstream. Item "
             f"'{item_handle}' and any bitstreams already posted to it will be deleted"
         )
+        super().__init__(message)
 
 
 class BitstreamPostError(Exception):  # Update after DSpace 8 migration
@@ -154,11 +158,12 @@ class BitstreamPostError(Exception):  # Update after DSpace 8 migration
         bitstream_name: str,
         item_handle: str,
     ):
-        self.message = (
+        message = (
             f"Error occurred while posting bitstream '{bitstream_name}' to item in "
             f"DSpace. Item '{item_handle}' and any bitstreams already posted to it "
             "will be deleted"
         )
+        super().__init__(message)
         self.dspace_error = source_error.response.text if source_error.response else None
 
 
@@ -179,7 +184,7 @@ class DSpaceTimeoutError(Exception):
         dspace_url: str,
         submission_attributes: dict,
     ):
-        self.message = (
+        message = (
             f"DSpace server at '{dspace_url}' took more than {CONFIG.dspace_timeout} "
             "seconds to respond. Aborting DSpace Submission Service processing until "
             "this can be investigated.\nNOTE: The submission in process when this "
@@ -187,6 +192,7 @@ class DSpaceTimeoutError(Exception):
             f"of the submission was '{submission_attributes['PackageID']}', from "
             f"source '{submission_attributes['SubmissionSource']}'"
         )
+        super().__init__(message)
 
 
 class DSpaceAuthenticationError(Exception):
@@ -206,12 +212,13 @@ class DSpaceAuthenticationError(Exception):
         dspace_url: str | float | None,
         dspace_user: str | float | None,
     ):
-        self.message = (
+        message = (
             f"Failed to authenticate to DSpace server at '{dspace_url}' with user "
             f"'{dspace_user}'. Please verify that the DSS_DSPACE_CREDENTIALS "
             "environment variable is set correctly and that the DSpace server is "
             "accessible."
         )
+        super().__init__(message)
 
 
 class SQSMessageSendError(Exception):
@@ -234,7 +241,7 @@ class SQSMessageSendError(Exception):
         result_queue: str,
         submit_message_id: str,
     ):
-        self.message = (
+        message = (
             f"Message was not successfully sent to result queue '{result_queue}', "
             "aborting DSpace Submission Service processing until this can be "
             "investigated. NOTE: The submit message is likely still in the submission "
@@ -242,6 +249,7 @@ class SQSMessageSendError(Exception):
             f"resumes. Submit message ID: {submit_message_id}. Result message "
             f"attributes: {message_attributes}. Result message body: {message_body}"
         )
+        super().__init__(message)
 
 
 # Submission message validation errors

@@ -27,9 +27,12 @@ def test_create(mocked_sqs):
     # confirm queue does not exist
     test_queue = "testing_123"
     c = sqs_client()
-    with pytest.raises(ClientError) as e:
+    with pytest.raises(ClientError) as exception:
         c.get_queue_by_name(QueueName=test_queue)
-    assert e.value.response["Error"]["Code"] == "AWS.SimpleQueueService.NonExistentQueue"
+    assert (
+        exception.value.response["Error"]["Code"]
+        == "AWS.SimpleQueueService.NonExistentQueue"
+    )
 
     # create queue
     create(test_queue)

@@ -293,7 +293,10 @@ def dspace8_submission_instance(test_dspace8_client):
             },
         ],
         result_queue=None,
-        attributes={},
+        attributes={
+            "PackageID": {"DataType": "String", "StringValue": "test"},
+            "SubmissionSource": {"DataType": "String", "StringValue": "dsc"},
+        },
     )
     submission.client = test_dspace8_client
     return submission
