@@ -91,28 +91,6 @@ def test_submission_from_message_success(input_message_good_dspace_mit, mocked_d
     assert submission.result_queue == "empty_result_queue"
 
 
-def test_submission_from_message_dspace_mit_success(
-    input_message_good_dspace_mit, mocked_dspace
-):
-    submission = Submission.from_message(input_message_good_dspace_mit)
-    assert submission.destination == "DSpace@MIT"
-    assert submission.collection_handle == "0000/collection01"
-    assert submission.metadata_location == "tests/fixtures/test-item-metadata.json"
-    assert submission.files == [
-        {
-            "BitstreamName": "test-file-01.pdf",
-            "FileLocation": "tests/fixtures/test-file-01.pdf",
-            "BitstreamDescription": "A test bitstream",
-        }
-    ]
-    assert submission.result_attributes == {
-        "PackageID": {"DataType": "String", "StringValue": "etdtest01"},
-        "SubmissionSource": {"DataType": "String", "StringValue": "etd"},
-    }
-    assert submission.result_message is None
-    assert submission.result_queue == "empty_result_queue"
-
-
 def test_submission_from_message_defaults_to_create_operation(
     input_message_good_dspace_mit,
 ):

@@ -9,6 +9,7 @@ import requests_mock
 from dspace_rest_client.client import DSpaceClient
 from moto import mock_aws
 
+from submitter.sqs import _sqs_queues
 from submitter.submission import Submission, dspace_clients
 
 
@@ -210,6 +211,12 @@ def dspace_client(mocked_dspace):
 def clear_dspace_client_cache():
     """Clear the DSpace client cache before each test."""
     dspace_clients.clear()
+
+
+@pytest.fixture(autouse=True)
+def clear_sqs_queue_cache():
+    """Clear the SQS queue cache before each test."""
+    _sqs_queues.clear()
 
 
 @pytest.fixture
