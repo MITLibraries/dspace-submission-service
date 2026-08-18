@@ -5,7 +5,6 @@ requires-python = ">=3.13"
 dependencies = [
     "boto3",
     "click",
-    "dspace-python-client",
     "dspace-rest-client",
     "jsonschema",
     "sentry-sdk",
@@ -55,9 +54,6 @@ override-dependencies = ["smart_open>=7.0.0", "requests>=2.34.0"]
 name = "pypi"
 url = "https://pypi.org/simple"
 
-[tool.uv.sources]
-dspace-python-client = { git = "https://github.com/mitlibraries/dspace-python-client.git" }
-
 [tool.pytest.ini_options]
 log_level = "INFO"
 env = [
@@ -84,6 +80,7 @@ ignore = [
 
     # project-specific
     "C90",
+    "CPY001",
     "D100",
     "D101",
     "D102",
@@ -99,6 +96,8 @@ ignore = [
     "PLR0913",
     "PLR0915",
     "S321",
+    "TD002",
+    "TD003",
     "TRY003",
 ]
 

@@ -16,6 +16,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 CONFIG = Config()
 
+# Cache for SQS queues
+_sqs_queues: dict[str, "Queue"] = {}
+
 
 def sqs_client() -> "SQSServiceResource":
     return boto3.resource(
@@ -24,15 +27,21 @@ def sqs_client() -> "SQSServiceResource":
     )
 
 
+def _get_sqs_queue(queue_name: str) -> "Queue":
+    """Get SQS queue, retrieving from cache if available."""
+    if queue_name not in _sqs_queues:
+        _sqs_queues[queue_name] = sqs_client().get_queue_by_name(QueueName=queue_name)
+    return _sqs_queues[queue_name]
+
+
 def message_loop(queue: str, wait: int, visibility: int = 30) -> None:
     logger.info("Message loop started")
-    msgs = retrieve_messages_from_queue(queue, wait, visibility)
-
-    if len(msgs) > 0:
+    while True:
+        msgs = retrieve_messages_from_queue(queue, wait, visibility)
+        if not msgs:
+            logger.info("No messages available in queue %s", queue)
+            break
         process(msgs)
-        message_loop(queue, wait)
-    else:
-        logger.info("No messages available in queue %s", queue)
 
 
 def process(msgs: list["Message"]) -> None:
@@ -75,8 +84,7 @@ def retrieve_messages_from_queue(
     wait: int,
     visibility: int = 30,
 ) -> list["Message"]:
-    sqs = sqs_client()
-    queue = sqs.get_queue_by_name(QueueName=input_queue)
+    queue = _get_sqs_queue(input_queue)
 
     logger.info("Polling queue %s for messages", input_queue)
     msgs = queue.receive_messages(
@@ -96,8 +104,7 @@ def write_message_to_queue(
     body: dict | str | None,
     output_queue: str,
 ) -> "SendMessageResultTypeDef":
-    sqs = sqs_client()
-    queue = sqs.get_queue_by_name(QueueName=output_queue)
+    queue = _get_sqs_queue(output_queue)
     return queue.send_message(
         MessageAttributes=attributes,
         MessageBody=json.dumps(body),

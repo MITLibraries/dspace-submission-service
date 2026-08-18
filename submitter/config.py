@@ -84,7 +84,6 @@ class Config:
         return {
             "DSpace@MIT": credentials["ir-8"],
             "IR-8": credentials["ir-8"],
-            "DDC-6": credentials["ddc-6"],
             "DDC-8": credentials["ddc-8"],
         }
 

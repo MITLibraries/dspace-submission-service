@@ -43,7 +43,7 @@ If you are just interested in testing SQS aspects of the application, you can by
 DSpace Submission (in Development only) by adding `SKIP_PROCESSING=true` to your `.env`
 file.
 
-The application supports submission to both DSpace 6 and DSpace 8 instances. For local development, the default request timeout for requests sent to the DSpace API
+The application supports submission to DSpace 8 instances. For local development, the default request timeout for requests sent to the DSpace API
 is 180 seconds. To set adjust the timeout, set `DSPACE_TIMEOUT=<seconds as a float, e.g. 30.0>` in your `.env` file.
 
 ## Sample Data
@@ -101,7 +101,7 @@ The commands are produced by the Terraform used to create the infrastructure and
 
 ```shell
 WORKSPACE=#Set to `dev` for local development, this will be set to `stage` and `prod` in those environments by Terraform.
-DSS_DSPACE_CREDENTIALS=#A JSON string containing credentials for all supported DSpace instances. Each entry requires 'url', 'user', and 'password' fields. Example: {"ir-6":{"url":"...","user":"...","password":"..."},"ddc-6":{...},"ir-8":{...},"ddc-8":{...}}
+DSS_DSPACE_CREDENTIALS=#A JSON string containing credentials for all supported DSpace instances. Each entry requires 'url', 'user', and 'password' fields. Example: {"ir-8":{"url":"...","user":"...","password":"..."},"ddc-8":{...}}
 INPUT_QUEUE=#Input message queue to use for development (see section below on using Moto for local SQS queues).
 OUTPUT_QUEUES=#Comma-separated string representing a list of valid output queues.
 ```

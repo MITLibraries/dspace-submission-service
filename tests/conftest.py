@@ -6,11 +6,10 @@ import os
 import boto3
 import pytest
 import requests_mock
-from dspace import DSpaceClient as DSpace6Client
-from dspace_rest_client.client import DSpaceClient as DSpace8Client
+from dspace_rest_client.client import DSpaceClient
 from moto import mock_aws
-from requests import exceptions
 
+from submitter.sqs import _sqs_queues
 from submitter.submission import Submission, dspace_clients
 
 
@@ -66,53 +65,7 @@ def mocked_dspace():
     "CollectionHandle: 0000/collection03".  This aligns with a URL defined here, and will
     therefore throw a requests.exceptions.ConnectTimeout exception to test against.
     """
-    with requests_mock.Mocker() as m:  # Update after DSpace 8 migration
-        # DSpace 6 URLs
-        m.post(
-            "mock://dspace.edu/rest/login",
-            cookies={"JSESSIONID": "sessioncookie"},
-        )
-        m.get(
-            "mock://dspace.edu/rest/handle/0000/collection01",
-            json={"uuid": "collection01"},
-        )
-        m.get(
-            "mock://dspace.edu/rest/handle/0000/collection02",
-            json={"uuid": "collection02"},
-        )
-        m.get(
-            "mock://dspace.edu/rest/handle/0000/collection03",
-            exc=exceptions.ConnectTimeout,
-        )
-        m.get(
-            "mock://dspace.edu/rest/handle/0000/collection04",
-            exc=exceptions.RequestException(
-                "Catastrophic error before or during request!  No response to parse."
-            ),
-        )
-        m.get(
-            "mock://dspace.edu/rest/handle/0000/not-a-collection",
-            status_code=404,
-        )
-        m.post(
-            "mock://dspace.edu/rest/collections/collection01/items",
-            json=item_post_response_01,
-        )
-        m.post(
-            "mock://dspace.edu/rest/collections/collection02/items",
-            json=item_post_response_02,
-        )
-        m.post(
-            "mock://dspace.edu/rest/items/item01/bitstreams",
-            json=bitstream_post_response,
-        )
-        m.post(
-            "mock://dspace.edu/rest/items/item02/bitstreams",
-            status_code=500,
-        )
-        m.delete("mock://dspace.edu/rest/bitstreams/bitstream01", status_code=200)
-        m.delete("mock://dspace.edu/rest/items/item01", status_code=200)
-        m.delete("mock://dspace.edu/rest/items/item02", status_code=200)
+    with requests_mock.Mocker() as m:
         # DSpace 8 URLs
         m.post("mock://dspace.edu/server/api/authn/login")
         m.get("mock://dspace.edu/server/api/authn/status", json={"authenticated": True})
@@ -192,14 +145,7 @@ def mocked_dspace():
 
 
 @pytest.fixture
-def mocked_dspace6_auth_failure():
-    with requests_mock.Mocker() as m:
-        m.post("mock://dspace.edu/rest/login", status_code=401)
-        yield m
-
-
-@pytest.fixture
-def mocked_dspace8_auth_failure():
+def mocked_dspace_auth_failure():
     with requests_mock.Mocker() as m:
         m.post("mock://dspace.edu/server/api/authn/login", status_code=401)
         yield m
@@ -217,7 +163,7 @@ def mocked_sqs(aws_credentials):
                 MessageAttributes=test_attributes,
                 MessageBody=json.dumps(
                     {
-                        "SubmissionSystem": "DDC-6",
+                        "SubmissionSystem": "IR-8",
                         "CollectionHandle": "0000/collection01",
                         "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                         "Files": [
@@ -250,15 +196,8 @@ def mocked_s3(aws_credentials):
 
 
 @pytest.fixture
-def test_dspace6_client(mocked_dspace):
-    client = DSpace6Client("mock://dspace.edu/rest/")
-    client.login("test", "test")
-    return client
-
-
-@pytest.fixture
-def test_dspace8_client(mocked_dspace):
-    client = DSpace8Client(
+def dspace_client(mocked_dspace):
+    client = DSpaceClient(
         api_endpoint="mock://dspace.edu/server/api",
         username="test",
         password="test",  # noqa: S106
@@ -274,36 +213,14 @@ def clear_dspace_client_cache():
     dspace_clients.clear()
 
 
-@pytest.fixture
-def dspace8_submission_instance(test_dspace8_client):
-    submission = Submission(
-        destination="IR-8",
-        collection_handle="0000/collection01",
-        metadata_location="tests/fixtures/test-item-metadata.json",
-        files=[
-            {
-                "BitstreamName": "test-file-01.pdf",
-                "FileLocation": "tests/fixtures/test-file-01.pdf",
-                "BitstreamDescription": "A test bitstream",
-            },
-            {
-                "BitstreamName": "test-file-02.pdf",
-                "FileLocation": "tests/fixtures/test-file-01.pdf",
-                "BitstreamDescription": "Another test bitstream",
-            },
-        ],
-        result_queue=None,
-        attributes={
-            "PackageID": {"DataType": "String", "StringValue": "test"},
-            "SubmissionSource": {"DataType": "String", "StringValue": "dsc"},
-        },
-    )
-    submission.client = test_dspace8_client
-    return submission
+@pytest.fixture(autouse=True)
+def clear_sqs_queue_cache():
+    """Clear the SQS queue cache before each test."""
+    _sqs_queues.clear()
 
 
 @pytest.fixture
-def dspace_mit_submission_instance(test_dspace8_client):
+def dspace_submission_instance(dspace_client):
     submission = Submission(
         destination="DSpace@MIT",
         collection_handle="0000/collection01",
@@ -323,41 +240,18 @@ def dspace_mit_submission_instance(test_dspace8_client):
         result_queue=None,
         attributes={},
     )
-    submission.client = test_dspace8_client
+    submission.client = dspace_client
     return submission
 
 
 @pytest.fixture
-def input_message_good_dspace6(mocked_sqs):
+def input_message_good_ddc8(mocked_sqs):
     queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
     queue.send_message(
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DDC-6",
-                "CollectionHandle": "0000/collection01",
-                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
-                "Files": [
-                    {
-                        "BitstreamName": "test-file-01.pdf",
-                        "FileLocation": "tests/fixtures/test-file-01.pdf",
-                        "BitstreamDescription": "A test bitstream",
-                    }
-                ],
-            }
-        ),
-    )
-    return queue.receive_messages(MessageAttributeNames=["All"])[0]
-
-
-@pytest.fixture
-def input_message_good_dspace8(mocked_sqs):
-    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
-    queue.send_message(
-        MessageAttributes=test_attributes,
-        MessageBody=json.dumps(
-            {
-                "SubmissionSystem": "IR-8",
+                "SubmissionSystem": "DDC-8",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
@@ -403,7 +297,7 @@ def input_message_missing_collection_handle(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DDC-6",
+                "SubmissionSystem": "IR-8",
                 "MetadataLocation": "tests/fixtures/test-item-metadata.json",
                 "Files": [
                     {
@@ -468,7 +362,7 @@ def input_message_item_create_error(mocked_sqs):
         MessageAttributes=test_attributes,
         MessageBody=json.dumps(
             {
-                "SubmissionSystem": "DDC-6",
+                "SubmissionSystem": "IR-8",
                 "CollectionHandle": "0000/collection01",
                 "MetadataLocation": "tests/fixtures/test-item-metadata-error.json",
                 "Files": [
@@ -477,148 +371,6 @@ def input_message_item_create_error(mocked_sqs):
                         "FileLocation": "tests/fixtures/test-file-01.pdf",
                         "BitstreamDescription": "A test bitstream",
                     }
-                ],
-            }
-        ),
-    )
-    return queue.receive_messages(MessageAttributeNames=["All"])[0]
-
-
-@pytest.fixture
-def input_message_bitstream_create_error(mocked_sqs):
-    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
-    queue.send_message(
-        MessageAttributes=test_attributes,
-        MessageBody=json.dumps(
-            {
-                "SubmissionSystem": "DDC-6",
-                "CollectionHandle": "0000/collection01",
-                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
-                "Files": [
-                    {
-                        "BitstreamName": "test-file-01.pdf",
-                        "BitstreamDescription": "A test bitstream",
-                    }
-                ],
-            }
-        ),
-    )
-    return queue.receive_messages(MessageAttributeNames=["All"])[0]
-
-
-@pytest.fixture
-def input_message_item_post_error(mocked_sqs):
-    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
-    queue.send_message(
-        MessageAttributes=test_attributes,
-        MessageBody=json.dumps(
-            {
-                "SubmissionSystem": "DDC-6",
-                "CollectionHandle": "0000/not-a-collection",
-                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
-                "Files": [
-                    {
-                        "BitstreamName": "test-file-01.pdf",
-                        "FileLocation": "tests/fixtures/test-file-01.pdf",
-                        "BitstreamDescription": "A test bitstream",
-                    }
-                ],
-            }
-        ),
-    )
-    return queue.receive_messages(MessageAttributeNames=["All"])[0]
-
-
-@pytest.fixture
-def input_message_item_post_dspace_timeout(mocked_sqs):
-    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
-    queue.send_message(
-        MessageAttributes=test_attributes,
-        MessageBody=json.dumps(
-            {
-                "SubmissionSystem": "DDC-6",
-                "CollectionHandle": "0000/collection03",
-                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
-                "Files": [
-                    {
-                        "BitstreamName": "test-file-01.pdf",
-                        "FileLocation": "tests/fixtures/test-file-01.pdf",
-                        "BitstreamDescription": "A test bitstream",
-                    }
-                ],
-            }
-        ),
-    )
-    return queue.receive_messages(MessageAttributeNames=["All"])[0]
-
-
-@pytest.fixture
-def input_message_bitstream_file_open_error(mocked_sqs):
-    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
-    queue.send_message(
-        MessageAttributes=test_attributes,
-        MessageBody=json.dumps(
-            {
-                "SubmissionSystem": "DDC-6",
-                "CollectionHandle": "0000/collection01",
-                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
-                "Files": [
-                    {
-                        "BitstreamName": "test-file-01.pdf",
-                        "FileLocation": "tests/fixtures/test-file-01.pdf",
-                        "BitstreamDescription": "A test bitstream",
-                    },
-                    {
-                        "BitstreamName": "No file",
-                        "FileLocation": "tests/fixtures/nothing-here",
-                        "BitstreamDescription": "No file",
-                    },
-                ],
-            }
-        ),
-    )
-    return queue.receive_messages(MessageAttributeNames=["All"])[0]
-
-
-@pytest.fixture
-def input_message_item_post_dspace_generic_500_error(mocked_sqs):
-    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
-    queue.send_message(
-        MessageAttributes=test_attributes,
-        MessageBody=json.dumps(
-            {
-                "SubmissionSystem": "DDC-6",
-                "CollectionHandle": "0000/collection04",
-                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
-                "Files": [
-                    {
-                        "BitstreamName": "test-file-01.pdf",
-                        "FileLocation": "tests/fixtures/test-file-01.pdf",
-                        "BitstreamDescription": "A test bitstream",
-                    }
-                ],
-            }
-        ),
-    )
-    return queue.receive_messages(MessageAttributeNames=["All"])[0]
-
-
-@pytest.fixture
-def input_message_bitstream_dspace_post_error(mocked_sqs):
-    queue = mocked_sqs.get_queue_by_name(QueueName="empty_input_queue")
-    queue.send_message(
-        MessageAttributes=test_attributes,
-        MessageBody=json.dumps(
-            {
-                "SubmissionSystem": "DDC-6",
-                "CollectionHandle": "0000/collection02",
-                "MetadataLocation": "tests/fixtures/test-item-metadata.json",
-                "Files": [
-                    {
-                        "BitstreamName": "test-file-01.pdf",
-                        "FileLocation": "tests/fixtures/test-file-01.pdf",
-                        "BitstreamDescription": "A test bitstream",
-                    },
                 ],
             }
         ),
@@ -659,16 +411,6 @@ def test_env(monkeypatch):
         "DSS_DSPACE_CREDENTIALS",
         json.dumps(
             {
-                "ir-6": {
-                    "url": "mock://dspace.edu/rest",
-                    "user": "test",
-                    "password": "test",
-                },
-                "ddc-6": {
-                    "url": "mock://dspace.edu/rest",
-                    "user": "test",
-                    "password": "test",
-                },
                 "ir-8": {
                     "url": "mock://dspace.edu/server/api",
                     "user": "test",
@@ -689,74 +431,6 @@ def test_env(monkeypatch):
     monkeypatch.setenv("SKIP_PROCESSING", "false")
     monkeypatch.setenv("SQS_ENDPOINT_URL", "https://sqs.us-east-1.amazonaws.com/")
 
-
-item_post_response_01 = {
-    "uuid": "item01",
-    "name": "Test Thesis",
-    "handle": "0000/item01",
-    "type": "item",
-    "link": "/rest/items/item01",
-    "expand": [
-        "metadata",
-        "parentCollection",
-        "parentCollectionList",
-        "parentCommunityList",
-        "bitstreams",
-        "all",
-    ],
-    "lastModified": "2015-01-12 15:44:12.978",
-    "parentCollection": None,
-    "parentCollectionList": None,
-    "parentCommunityList": None,
-    "bitstreams": None,
-    "archived": "true",
-    "withdrawn": "false",
-}
-
-item_post_response_02 = {
-    "uuid": "item02",
-    "name": "Test Thesis",
-    "handle": "0000/item02",
-    "type": "item",
-    "link": "/rest/items/item02",
-    "expand": [
-        "metadata",
-        "parentCollection",
-        "parentCollectionList",
-        "parentCommunityList",
-        "bitstreams",
-        "all",
-    ],
-    "lastModified": "2015-01-12 15:44:12.978",
-    "parentCollection": None,
-    "parentCollectionList": None,
-    "parentCommunityList": None,
-    "bitstreams": None,
-    "archived": "true",
-    "withdrawn": "false",
-}
-
-bitstream_post_response = {
-    "uuid": "bitstream01",
-    "name": "test-file-01.pdf",
-    "handle": None,
-    "type": "bitstream",
-    "link": "/rest/bitstreams/bitstream01",
-    "expand": ["parent", "policies", "all"],
-    "bundleName": "ORIGINAL",
-    "description": "A test bitstream",
-    "format": "Adobe PDF",
-    "mimeType": "application/pdf",
-    "sizeBytes": 129112,
-    "parentObject": None,
-    "retrieveLink": "/bitstreams/bitstream01/retrieve",
-    "checkSum": {
-        "value": "62778292a3a6dccbe2662a2bfca3b86e",
-        "checkSumAlgorithm": "MD5",
-    },
-    "sequenceId": 1,
-    "policies": None,
-}
 
 test_attributes = {
     "PackageID": {"DataType": "String", "StringValue": "etdtest01"},

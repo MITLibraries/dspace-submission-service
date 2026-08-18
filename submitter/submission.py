@@ -1,29 +1,16 @@
-# ruff: noqa: TD002, TD003, FIX002
 import json
 import logging
 import os
 import sys
 import traceback
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Literal
 
-import dspace
 import requests
 import smart_open
-from dspace.client import (
-    DSpaceClient as DSpace6Client,
-)  # Update after DSpace 8 migration
-from dspace.item import Item as DSpace6Item  # Update after DSpace 8 migration
-from dspace_rest_client.client import (
-    DSpaceClient as DSpace8Client,
-)  # Update after DSpace 8 migration
-from dspace_rest_client.models import Bitstream as DSpace8Bitstream
-from dspace_rest_client.models import (
-    Bundle as DSpace8Bundle,
-)  # Update after DSpace 8 migration
-from dspace_rest_client.models import Item as DSpace8Item
+from dspace_rest_client.client import DSpaceClient
+from dspace_rest_client.models import Bitstream, Bundle, Item
 
 from submitter import errors
 from submitter.config import Config
@@ -36,9 +23,7 @@ logger = logging.getLogger(__name__)
 CONFIG = Config()
 
 # Shared cache for DSpace clients across all Submission instances
-dspace_clients: dict[
-    str, DSpace6Client | DSpace8Client
-] = {}  # Update after DSpace 8 migration
+dspace_clients: dict[str, DSpaceClient] = {}
 
 
 class ValidItemOperations(StrEnum):
@@ -92,20 +77,11 @@ class Submission:
         logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
         try:
-            if self.destination == "DDC-6":  # Update after DSpace 8 migration
-                item = self._submit_item_dspace6()
-                self.result_success_message(item)
-            elif self.destination in ["DSpace@MIT", "IR-8", "DDC-8"]:
-                item, bundle = self._submit_item_dspace8()
-                self.result_success_message(item, bundle)
+            item, bundle = self._submit_item()
+            self.result_success_message(item, bundle)
 
         # Expected exception, generate error message and continue
-        except (
-            errors.SubmissionError,
-            errors.ItemPostError,  # Update after DSpace 8 migration
-            errors.BitstreamOpenError,  # Update after DSpace 8 migration
-            errors.BitstreamPostError,  # Update after DSpace 8 migration
-        ) as exception:
+        except errors.SubmissionError as exception:
             self.result_error_message(
                 str(exception), getattr(exception, "dspace_error", None)
             )
@@ -124,9 +100,7 @@ class Submission:
             )
             raise
 
-    def get_dspace_client(
-        self,
-    ) -> DSpace6Client | DSpace8Client:  # Update after DSpace 8 migration
+    def get_dspace_client(self) -> DSpaceClient:
         """Create or get a cached DSpace client for the submission destination."""
         if not self.destination:
             raise errors.InvalidDSpaceDestinationError(self.destination)
@@ -140,38 +114,15 @@ class Submission:
             )
         return dspace_clients[self.destination]
 
-    def _create_dspace_client(
-        self, destination: str
-    ) -> DSpace6Client | DSpace8Client:  # Update after DSpace 8 migration
+    def _create_dspace_client(self, destination: str) -> DSpaceClient:
         """Create a DSpace client for the submission destination."""
         logger.debug(f"Creating DSpace client for destination '{destination}'")
         try:
             credentials = CONFIG.dspace_credentials[destination]
-        except KeyError as exc:
-            raise errors.InvalidDSpaceDestinationError(destination) from exc
-        if destination == "DDC-6":  # Update after DSpace 8 migration
-            return self._create_dspace6_client(credentials)
-        elif destination in ["DSpace@MIT", "IR-8", "DDC-8"]:  # noqa: RET505
-            return self._create_dspace8_client(credentials)
-        raise ValueError(f"Destination value not recognized: {destination}")
+        except KeyError as exception:
+            raise errors.InvalidDSpaceDestinationError(destination) from exception
 
-    def _create_dspace6_client(
-        self, credentials: dict[str, str | float | None]
-    ) -> DSpace6Client:
-        """Create and authenticate a DSpace 6 client."""
-        client = DSpace6Client(credentials["url"], timeout=CONFIG.dspace_timeout)
-        client.login(credentials["user"], credentials["password"])
-        logger.info(
-            f'Successfully authenticated to "{credentials["url"]}" as '
-            f'"{credentials["user"]}"'
-        )
-        return client
-
-    def _create_dspace8_client(
-        self, credentials: dict[str, str | float | None]
-    ) -> DSpace8Client:
-        """Create and authenticate a DSpace 8 client."""
-        client = DSpace8Client(
+        client = DSpaceClient(
             api_endpoint=credentials["url"],
             username=credentials["user"],
             password=credentials["password"],
@@ -241,105 +192,7 @@ class Submission:
             files=message_body["Files"],
         )
 
-    def _submit_item_dspace6(  # Update after DSpace 8 migration
-        self,
-    ) -> DSpace6Item:
-        """Create item instance with metadata entries from submission message."""
-        logger.debug("Creating local item instance from submission message")
-        item = DSpace6Item()
-        try:
-            for entry in self._get_metadata_entries_from_file_dspace6():
-                metadata_entry = dspace.item.MetadataEntry.from_dict(entry)
-                item.metadata.append(metadata_entry)
-        except KeyError as exception:
-            raise errors.ItemError(
-                (
-                    "Error occurred while creating item metadata entries from file "
-                    f"'{self.metadata_location}'"
-                ),
-                exception=exception,
-            ) from exception
-
-        item = self._add_bitstreams_to_item_dspace6(item)
-        self._post_item_dspace6(item, self.collection_handle)
-        self._post_bitstreams_dspace6(item)
-        return item
-
-    def _get_metadata_entries_from_file_dspace6(  # Update after DSpace 8 migration
-        self,
-    ) -> Iterator[dict]:
-        if self.metadata_location is None:
-            raise errors.ItemError(
-                "metadata_location is required for DSpace 6 item creation"
-            )
-        with smart_open.open(self.metadata_location) as f:
-            metadata = json.load(f)
-        yield from metadata["metadata"]
-
-    def _add_bitstreams_to_item_dspace6(  # Update after DSpace 8 migration
-        self, item: DSpace6Item
-    ) -> DSpace6Item:
-        """Add bitstreams to item from files in submission message."""
-        logger.debug("Adding bitstreams to local item instance from submission message")
-
-        for file in self.files or []:
-            bitstream = dspace.bitstream.Bitstream(
-                file_path=file["FileLocation"],
-                name=file["BitstreamName"],
-                description=file.get("BitstreamDescription"),
-            )
-            item.bitstreams.append(bitstream)
-        return item
-
-    def _post_item_dspace6(  # Update after DSpace 8 migration
-        self,
-        item: DSpace6Item,
-        collection_handle: str | None,
-    ) -> None:
-        """Post item with metadata to DSpace."""
-        try:
-            entries = [entry.to_dict() for entry in item.metadata]
-            logger.debug(
-                "Posting item to DSpace with metadata: %s",
-                json.dumps(entries, indent=2),
-            )
-            item.post(self.client, collection_handle=collection_handle)
-            logger.debug("Posted item to Dspace with handle '%s'", item.handle)
-        except requests.exceptions.Timeout:
-            raise
-        except requests.exceptions.HTTPError as exception:
-            raise errors.ItemPostError(exception, collection_handle) from exception
-
-    def _post_bitstreams_dspace6(  # Update after DSpace 8 migration
-        self, item: DSpace6Item
-    ) -> None:
-        """Post all bitstreams to an existing DSpace item."""
-        logger.debug(
-            "Posting %d bitstream(s) to item '%s' in DSpace",
-            len(item.bitstreams),
-            item.handle,
-        )
-        for bitstream in item.bitstreams:
-            try:
-                bitstream.post(self.client, item_uuid=item.uuid)
-                logger.debug(
-                    "Posted bitstream '%s' to item '%s', new bitstream uuid is '%s'",
-                    bitstream.name,
-                    item.handle,
-                    bitstream.uuid,
-                )
-            except (FileNotFoundError, requests.exceptions.RequestException) as exception:
-                partial_item_handle = item.handle
-                self.clean_up_partial_success_dspace6(item)
-                if isinstance(exception, FileNotFoundError):
-                    raise errors.BitstreamOpenError(
-                        bitstream.file_path, partial_item_handle
-                    ) from exception
-                raise errors.BitstreamPostError(
-                    exception, bitstream.name, partial_item_handle
-                ) from exception
-
-    def _submit_item_dspace8(self) -> tuple[DSpace8Item, DSpace8Bundle]:
+    def _submit_item(self) -> tuple[Item, Bundle]:
         """Submit item instance from submission message.
 
         This method can handle either item 'create' or 'update' operations,
@@ -348,48 +201,51 @@ class Submission:
         if Submission is instantiated using from_message(), any invalid values
         would have been captured by JSON schema validation beforehand.
         """
-        if self.operation == "update":
+        if self.operation == ValidItemOperations.UPDATE:
             try:
-                item, bundle = self._update_item_dspace8()
+                item, bundle = self._update_item()
             except errors.SubmissionError:
                 logger.exception(
                     f"Error occurred while updating item '{self.item_handle}'"
                 )
                 raise
-        elif self.operation == "create":
+        elif self.operation == ValidItemOperations.CREATE:
             try:
-                item = self._create_item_dspace8()
-                bundle = self._create_bundle_dspace8(item)
+                item = self._create_item()
+                bundle = self._create_bundle(item)
                 for bitstream_uri in self.files or []:
-                    self._create_bitstream_dspace8(item, bundle, bitstream_uri)
+                    self._create_bitstream(item, bundle, bitstream_uri)
             except errors.SubmissionError:
                 logger.exception(
                     "Error occurred while creating item with PackageID="
-                    f"{self.result_attributes['PackageID']['StringValue']}"
+                    f"{self.result_attributes.get('PackageID', {}).get('StringValue', 'unknown')}"  # noqa: E501
                 )
                 raise
         else:
             raise errors.SubmissionError(f"Operation not recognized: {self.operation}")
         return item, bundle
 
-    def _create_item_dspace8(self) -> DSpace8Item:
+    def _create_item(self) -> Item:
         """Create item in DSpace from submission message.
 
-        Note: Separate try-except blocks is are added to distinguish any errors
+        Note: Separate try-except blocks are added to distinguish any errors
         related to accessing and opening the file in S3 from errors related
         requests to the DSpace server. For the former, the exception is not
         passed to ItemError to avoid incorrect assignment to Submission.dspace_error.
         """
         # check whether the collection exists
+        if self.collection_handle is None:
+            raise errors.ItemError("collection_handle is required for item creation")
+
         collection = self.client.resolve_identifier_to_dso(
             identifier=self.collection_handle
         )
-        if self.collection_handle and not collection:
+        if not collection:
             raise errors.DSpaceObjectNotFoundError(identifier=self.collection_handle)
 
         if self.metadata_location is None:
             raise errors.ItemError(
-                "metadata_location is required for DSpace 8 item creation"
+                message="metadata_location is required for item creation"
             )
         try:
             with smart_open.open(self.metadata_location, "r") as metadata:
@@ -406,7 +262,7 @@ class Submission:
         try:
             item = self.client.create_item(
                 parent=collection.uuid,
-                item=DSpace8Item(item_data),
+                item=Item(item_data),
             )
         except Exception as exception:
             raise errors.ItemError(
@@ -417,7 +273,7 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception when the returned
+        # NOTE: This check is added to raise an exception when the returned
         # Item object's handle is None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if item.handle is None:
@@ -428,12 +284,12 @@ class Submission:
         logger.info(f"Item created with handle: {item.handle}")
         return item
 
-    def _create_bundle_dspace8(self, item: DSpace8Item) -> DSpace8Bundle:
+    def _create_bundle(self, item: Item) -> Bundle:
         """Create ORIGINAL bundle for a specified item."""
         try:
             bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
         except Exception as exception:
-            self.clean_up_partial_success_dspace8(item)
+            self.clean_up_partial_success(item)
             raise errors.BundleError(
                 (
                     f"Error occurred while creating bundle for item '{item.handle}' "
@@ -442,11 +298,11 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception when the returned
+        # NOTE: This check is added to raise an exception when the returned
         # Bundle object's uuid is None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bundle.uuid is None:
-            self.clean_up_partial_success_dspace8(item)
+            self.clean_up_partial_success(item)
             raise errors.BundleError(
                 f"Error occurred while creating bundle for item '{item.handle}' "
                 "in DSpace. Item and any bitstreams already posted to it will be deleted"
@@ -455,9 +311,7 @@ class Submission:
         logger.info(f"Bundle created with UUID: {bundle.uuid}")
         return bundle
 
-    def _create_bitstream_dspace8(
-        self, item: DSpace8Item, bundle: DSpace8Bundle, bitstream_data: dict
-    ) -> None:
+    def _create_bitstream(self, item: Item, bundle: Bundle, bitstream_data: dict) -> None:
         """Create bitstream for a specified item bundle."""
         try:
             bitstream = self.client.create_bitstream(
@@ -466,7 +320,7 @@ class Submission:
                 path=bitstream_data["FileLocation"],
             )
         except Exception as exception:
-            self.clean_up_partial_success_dspace8(item)
+            self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
                     "Error occurred while creating bitstream from file "
@@ -475,11 +329,11 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception when the client
+        # NOTE: This check is added to raise an exception when the client
         # returns None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bitstream is None:
-            self.clean_up_partial_success_dspace8(item)
+            self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
                     "Error occurred while creating bitstream from file "
@@ -489,7 +343,7 @@ class Submission:
 
         logger.info(f"Bitstream created with UUID: {bitstream.uuid}")
 
-    def _update_item_dspace8(self) -> tuple[DSpace8Item, DSpace8Bundle]:
+    def _update_item(self) -> tuple[Item, Bundle]:
         """Update item in DSpace"""
         if not self.item_handle:
             raise errors.ItemError(
@@ -499,16 +353,16 @@ class Submission:
         dspace_object = self.client.resolve_identifier_to_dso(identifier=self.item_handle)
         if not dspace_object:
             raise errors.DSpaceObjectNotFoundError(self.item_handle)
-        item = DSpace8Item(dso=dspace_object)  # need to cast to DSpace 8 item
+        item = Item(dso=dspace_object)  # need to cast to Item
 
         logger.debug(
             "At this time, the 'update' operation only updates bitstreams "
             "and adding metadata fields related to bitstream update!"
         )
-        bundle = self._update_item_bitstream_dspace8(item)
+        bundle = self._update_item_bitstream(item)
         return item, bundle
 
-    def _update_item_bitstream_dspace8(self, item: DSpace8Item) -> DSpace8Bundle:
+    def _update_item_bitstream(self, item: Item) -> Bundle:
         """Update bitstreams for an item in DSpace.
 
         This method performs a full replacement of an item's bitstreams, which
@@ -546,15 +400,13 @@ class Submission:
 
         return bundle
 
-    def _get_original_bundle(self, item: DSpace8Item) -> DSpace8Bundle:
+    def _get_original_bundle(self, item: Item) -> Bundle:
         for bundle in self.client.get_bundles_iter(parent=item):
             if bundle.name == "ORIGINAL":
                 return bundle
         raise errors.ItemError(f"Item {item.handle} does not have an 'ORIGINAL' bundle")
 
-    def _get_item_bitstream_bundle(
-        self, item: DSpace8Item
-    ) -> tuple[DSpace8Bitstream | None, DSpace8Bundle]:
+    def _get_item_bitstream_bundle(self, item: Item) -> tuple[Bitstream | None, Bundle]:
         """Retrieve single bitstream from an item's 'ORIGINAL' bundle."""
         bundle = self._get_original_bundle(item)
         bitstreams = self.client.get_bitstreams(bundle=bundle)
@@ -572,9 +424,7 @@ class Submission:
 
         return bitstreams[0], bundle
 
-    def _upload_new_item_bitstreams(
-        self, item: DSpace8Item, bundle: DSpace8Bundle
-    ) -> list[DSpace8Bitstream]:
+    def _upload_new_item_bitstreams(self, item: Item, bundle: Bundle) -> list[Bitstream]:
         """Upload new bitstreams to item bundle.
 
         The method will attempt to upload all the bitstreams specified in
@@ -587,7 +437,7 @@ class Submission:
         if not self.files:
             raise errors.ItemError("The 'files' attribute cannot be empty")
 
-        added_bitstreams: list[DSpace8Bitstream] = []
+        added_bitstreams: list[Bitstream] = []
         failed_bitstreams: list[str] = []
 
         # update 'ORIGINAL' bundle with new bitstreams
@@ -602,7 +452,7 @@ class Submission:
                 failed_bitstreams.append(bitstream_uri["BitstreamName"])
                 continue
             else:
-                # TODO: This check is added because the client can return None
+                # NOTE: This check is added because the client can return None
                 if bitstream is None:
                     failed_bitstreams.append(bitstream_uri["BitstreamName"])
                 else:
@@ -637,11 +487,9 @@ class Submission:
 
         return added_bitstreams
 
-    def _delete_old_item_bitstream(
-        self, item: DSpace8Item, bitstream: DSpace8Bitstream
-    ) -> None:
+    def _delete_old_item_bitstream(self, item: Item, bitstream: Bitstream) -> None:
         try:
-            self._delete_bitstream_dspace8(bitstream)
+            self._delete_bitstream(bitstream)
         except errors.BitstreamError as exception:
             raise errors.BitstreamError(
                 f"Error occurred while deleting original bitstream "
@@ -649,9 +497,7 @@ class Submission:
                 f"Please delete this file to complete item update."
             ) from exception
 
-    def _undo_bitstream_updates(
-        self, bitstreams: list[DSpace8Bitstream]
-    ) -> list[DSpace8Bitstream]:
+    def _undo_bitstream_updates(self, bitstreams: list[Bitstream]) -> list[Bitstream]:
         """Delete bitstreams according to a provided list.
 
         Call this method to restore the item's original state if any bitstream
@@ -666,17 +512,17 @@ class Submission:
             logger.info("'bitstreams' is empty, nothing to delete!")
             return []
 
-        deleted_bitstreams: list[DSpace8Bitstream] = []
+        deleted_bitstreams: list[Bitstream] = []
         for bitstream in bitstreams:
             try:
-                self._delete_bitstream_dspace8(bitstream)
+                self._delete_bitstream(bitstream)
                 deleted_bitstreams.append(bitstream)
             except errors.BitstreamError:
                 logger.exception("Error occurred while undoing bitstream update")
 
         return list(set(bitstreams) - set(deleted_bitstreams))
 
-    def _delete_bitstream_dspace8(self, bitstream: DSpace8Bitstream) -> None:
+    def _delete_bitstream(self, bitstream: Bitstream) -> None:
         """Delete Bitstream object.
 
         NOTE: This code was pulled from dspace-rest-python's (v0.1.17)
@@ -694,7 +540,7 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception if
+        # NOTE: This check is added to raise an exception if
         # response.status_code is not equal to 204 (No Content).
         # Should be updated if/when dspace-rest-python is
         # updated to raise exceptions.
@@ -722,9 +568,7 @@ class Submission:
             "ExceptionTraceback": prettify(tb),
         }
 
-    def result_success_message(
-        self, item: DSpace6Item | DSpace8Item, bundle: DSpace8Bundle | None = None
-    ) -> None:
+    def result_success_message(self, item: Item, bundle: Bundle) -> None:
         """Set result message on Submission object on successful submit."""
         self.result_message = {
             "ResultType": "success",
@@ -732,12 +576,9 @@ class Submission:
             "lastModified": item.lastModified,
             "Bitstreams": [],
         }
-        if isinstance(item, DSpace6Item):  # Update after DSpace 8 migration
-            bitstreams = item.bitstreams
-        elif isinstance(item, DSpace8Item):
-            bitstreams = self.client.get_bitstreams(bundle=bundle)
-        else:
-            raise TypeError("Item is neither a 'DSpace6Item' or a 'DSpace8Item'.")
+
+        bitstreams = self.client.get_bitstreams(bundle=bundle)
+
         for bitstream in bitstreams:
             self.result_message["Bitstreams"].append(
                 {
@@ -747,18 +588,7 @@ class Submission:
                 }
             )
 
-    def clean_up_partial_success_dspace6(self, item: DSpace6Item) -> None:
-        logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
-        handle = item.handle
-        for bitstream in item.bitstreams:
-            if bitstream.uuid is not None:
-                uuid = bitstream.uuid
-                bitstream.delete(self.client)
-                logger.info("Bitstream '%s' deleted from DSpace", uuid)
-        item.delete(self.client)
-        logger.info("Item '%s' deleted from DSpace", handle)
-
-    def clean_up_partial_success_dspace8(self, item: DSpace8Item) -> None:
+    def clean_up_partial_success(self, item: Item) -> None:
         handle = item.handle
         logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
         try:
