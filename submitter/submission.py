@@ -1,4 +1,3 @@
-# ruff: noqa: TD002, TD003, FIX002
 import json
 import logging
 import os
@@ -82,8 +81,10 @@ class Submission:
             self.result_success_message(item, bundle)
 
         # Expected exception, generate error message and continue
-        except errors.SubmissionError as e:
-            self.result_error_message(str(e), getattr(e, "dspace_error", None))
+        except errors.SubmissionError as exception:
+            self.result_error_message(
+                str(exception), getattr(exception, "dspace_error", None)
+            )
 
         # DSpace timeout error, abort
         except requests.exceptions.Timeout as exception:
@@ -118,8 +119,8 @@ class Submission:
         logger.debug(f"Creating DSpace client for destination '{destination}'")
         try:
             credentials = CONFIG.dspace_credentials[destination]
-        except KeyError as exc:
-            raise errors.InvalidDSpaceDestinationError(destination) from exc
+        except KeyError as exception:
+            raise errors.InvalidDSpaceDestinationError(destination) from exception
 
         client = DSpaceClient(
             api_endpoint=credentials["url"],
@@ -272,11 +273,10 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception when the returned
+        # NOTE: This check is added to raise an exception when the returned
         # Item object's handle is None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if item.handle is None:
-            logger.error("Error creating item:")
             raise errors.ItemError(
                 f"Error occurred while creating item from file '{self.metadata_location}'"
             )
@@ -289,7 +289,6 @@ class Submission:
         try:
             bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
         except Exception as exception:
-            logger.exception("Error creating bundle:")
             self.clean_up_partial_success(item)
             raise errors.BundleError(
                 (
@@ -299,11 +298,10 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception when the returned
+        # NOTE: This check is added to raise an exception when the returned
         # Bundle object's uuid is None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bundle.uuid is None:
-            logger.error("Error creating bundle:")
             self.clean_up_partial_success(item)
             raise errors.BundleError(
                 f"Error occurred while creating bundle for item '{item.handle}' "
@@ -322,7 +320,6 @@ class Submission:
                 path=bitstream_data["FileLocation"],
             )
         except Exception as exception:
-            logger.exception("Error creating bitstream:")
             self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
@@ -332,11 +329,10 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception when the client
+        # NOTE: This check is added to raise an exception when the client
         # returns None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bitstream is None:
-            logger.error("Error creating bitstream:")
             self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
@@ -456,7 +452,7 @@ class Submission:
                 failed_bitstreams.append(bitstream_uri["BitstreamName"])
                 continue
             else:
-                # TODO: This check is added because the client can return None
+                # NOTE: This check is added because the client can return None
                 if bitstream is None:
                     failed_bitstreams.append(bitstream_uri["BitstreamName"])
                 else:
@@ -544,7 +540,7 @@ class Submission:
                 exception=exception,
             ) from exception
 
-        # TODO: This check is added to raise an exception if
+        # NOTE: This check is added to raise an exception if
         # response.status_code is not equal to 204 (No Content).
         # Should be updated if/when dspace-rest-python is
         # updated to raise exceptions.

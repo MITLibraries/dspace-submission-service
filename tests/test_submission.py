@@ -214,7 +214,6 @@ def test_submit_item_bundle_create_error_raises_exception(
     mock_create_bundle.side_effect = RequestException
     with pytest.raises(errors.BundleError):
         dspace_submission_instance._submit_item()
-    assert "Error creating bundle:" in caplog.text
 
 
 @patch("submitter.submission.DSpaceClient.create_bitstream")
@@ -228,7 +227,6 @@ def test_submit_item_bitstream_error_raises_exception(
 
     with pytest.raises(errors.BitstreamError):
         dspace_submission_instance._submit_item()
-    assert "Error creating bitstream:" in caplog.text
 
 
 @patch("submitter.submission.DSpaceClient.create_bitstream")
