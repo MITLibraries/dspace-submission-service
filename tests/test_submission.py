@@ -57,7 +57,12 @@ def test_submission_get_dspace_client_invalid_destination_raises_error():
         attributes=None,
         result_queue=None,
     )
-    with pytest.raises(errors.InvalidDSpaceDestinationError):
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "'submission_system' should be one of ['DSpace@MIT','IR-8', 'DDC-8'], got 'InvalidDestination'"  # noqa: E501
+        ),
+    ):
         submission.get_dspace_client()
 
 

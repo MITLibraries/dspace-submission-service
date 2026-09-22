@@ -18,7 +18,7 @@ def test_config_optional_env_var_access(monkeypatch):
 
 def test_config_required_env_var_access(monkeypatch):
     monkeypatch.delenv("INPUT_QUEUE")
-    with pytest.raises(OSError):  # noqa: PT011
+    with pytest.raises(ValueError):  # noqa: PT011
         _ = CONFIG.input_queue
 
 

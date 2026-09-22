@@ -101,7 +101,8 @@ The commands are produced by the Terraform used to create the infrastructure and
 
 ```shell
 WORKSPACE=#Set to `dev` for local development, this will be set to `stage` and `prod` in those environments by Terraform.
-DSS_DSPACE_CREDENTIALS=#A JSON string containing credentials for all supported DSpace instances. Each entry requires 'url', 'user', and 'password' fields. Example: {"ir-8":{"url":"...","user":"...","password":"..."},"ddc-8":{...}}
+DIGCOLL_RW_API_CREDENTIALS_JSON=#A JSON string containing credentials with read and write permissions for Digital Collections. Requires 'url', 'user', and 'password' fields; optionally requires 'headers' and 'description'. Example: {"url":"...","user":"...","password":"...", "headers":"...", "description":"..."}
+OPENSCHOL_RW_API_CREDENTIALS_JSON=#A JSON string containing credentials with read and write permissions for MIT Open Scholarship. Requires 'url', 'user', and 'password' fields; optionally requires 'headers' and 'description'. Example: {"url":"...","user":"...","password":"...", "headers":"...", "description":"..."}
 INPUT_QUEUE=#Input message queue to use for development (see section below on using Moto for local SQS queues).
 OUTPUT_QUEUES=#Comma-separated string representing a list of valid output queues.
 ```

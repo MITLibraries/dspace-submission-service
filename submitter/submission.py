@@ -38,7 +38,7 @@ class Submission:
         result_queue: str,
         *,
         result_message: dict | str | None = None,
-        destination: str | None = None,
+        destination: Literal["DSpace@MIT", "IR-8", "DDC-8"] | None = None,
         operation: (
             Literal[ValidItemOperations.CREATE, ValidItemOperations.UPDATE] | None
         ) = ValidItemOperations.CREATE,
@@ -114,13 +114,12 @@ class Submission:
             )
         return dspace_clients[self.destination]
 
-    def _create_dspace_client(self, destination: str) -> DSpaceClient:
+    def _create_dspace_client(
+        self, destination: Literal["DSpace@MIT", "IR-8", "DDC-8"]
+    ) -> DSpaceClient:
         """Create a DSpace client for the submission destination."""
         logger.debug(f"Creating DSpace client for destination '{destination}'")
-        try:
-            credentials = CONFIG.dspace_credentials[destination]
-        except KeyError as exception:
-            raise errors.InvalidDSpaceDestinationError(destination) from exception
+        credentials = CONFIG.get_dspace_credentials(destination)
 
         client = DSpaceClient(
             api_endpoint=credentials["url"],
@@ -128,6 +127,16 @@ class Submission:
             password=credentials["password"],
             fake_user_agent=True,
         )
+        # add custom request headers
+        # NOTE: Remove after header management has been standardized in
+        #       the 3rd party dspace-rest-python client
+        if credentials.get("headers"):
+            headers = json.loads(credentials["headers"])
+            client.request_headers.update(headers)
+            client.auth_request_headers.update(headers)
+            client.list_request_headers.update(headers)
+            client.session.headers.update(headers)
+
         authenticated = client.authenticate()
         if not authenticated:
             raise errors.DSpaceAuthenticationError(
