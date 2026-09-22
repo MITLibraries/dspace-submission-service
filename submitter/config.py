@@ -91,7 +91,14 @@ class Config:
     def get_dspace_credentials(
         self, submission_system: Literal["DSpace@MIT", "IR-8", "DDC-8"]
     ) -> dict:
-        """Get parsed dspace credentials."""
+        """Get parsed dspace credentials.
+
+        The values for `submission_system` are pulled from the submission message (i.e.,
+        MessageBody.SubmissionSystem). The expected values map to MIT's DSpace
+        repositories:
+            * DSpace@MIT, IR-8 -> MIT Open Scholarship
+            * DDC-8 -> Digital Collections
+        """
         if submission_system in ("DSpace@MIT", "IR-8"):
             return self.openschol_rw_api_credentials_json
         if submission_system == "DDC-8":
