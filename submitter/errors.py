@@ -142,9 +142,9 @@ class DSpaceAuthenticationError(Exception):
     ):
         message = (
             f"Failed to authenticate to DSpace server at '{dspace_url}' with user "
-            f"'{dspace_user}'. Please verify that the DSS_DSPACE_CREDENTIALS "
-            "environment variable is set correctly and that the DSpace server is "
-            "accessible."
+            f"'{dspace_user}'. Please verify that the DIGCOLL_RW_API_CREDENTIALS_JSON "
+            "and OPENSCHOL_RW_API_CREDENTIALS_JSON environment variables are set "
+            "correctly and that the DSpace server is accessible."
         )
         super().__init__(message)
 

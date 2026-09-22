@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 
 import click
 
@@ -114,14 +115,14 @@ def create_queue(name: str) -> None:
     help="Name of submission system to verify connection to",
 )
 def verify_dspace_connection(
-    submission_system: str,
+    submission_system: Literal["DSpace@MIT", "IR-8", "DDC-8"],
 ) -> None:
     submission = Submission(
         destination=submission_system,
         attributes={},
         result_queue="non_existent_queue",
     )
-    credentials = CONFIG.dspace_credentials[submission_system]
+    credentials = CONFIG.get_dspace_credentials(submission_system)
     try:
         submission.get_dspace_client()
     except DSpaceAuthenticationError:
