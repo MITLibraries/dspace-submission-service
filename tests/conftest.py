@@ -408,11 +408,11 @@ def raw_body():
 def test_env(monkeypatch):
     monkeypatch.setenv("WORKSPACE", "test")
     monkeypatch.setenv(
-        "OPENSCHOL_RW_API_CREDENTIALS_JSON",
+        "OPENSCHOL_RW_API_CREDS_JSON",
         '{"url": "mock://dspace.edu/server/api", "user": "test", "password": "topsecret"}',  # noqa: E501
     )
     monkeypatch.setenv(
-        "DIGCOLL_RW_API_CREDENTIALS_JSON",
+        "DIGCOLL_RW_API_CREDS_JSON",
         '{"url": "mock://dspace.edu/server/api", "user": "test", "password": "topsecret"}',  # noqa: E501
     )
     monkeypatch.setenv("INPUT_QUEUE", "input_queue")

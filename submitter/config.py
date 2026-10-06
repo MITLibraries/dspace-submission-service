@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 class Config:
     REQUIRED_ENV_VARS = (
         "WORKSPACE",
-        "DIGCOLL_RW_API_CREDENTIALS_JSON",
-        "OPENSCHOL_RW_API_CREDENTIALS_JSON",
+        "DIGCOLL_RW_API_CREDS_JSON",
+        "OPENSCHOL_RW_API_CREDS_JSON",
         "INPUT_QUEUE",
         "OUTPUT_QUEUES",
     )
@@ -29,19 +29,17 @@ class Config:
         return os.getenv("WORKSPACE", "dev")
 
     @property
-    def digcoll_rw_api_credentials_json(self) -> dict:
-        value = os.getenv("DIGCOLL_RW_API_CREDENTIALS_JSON")
+    def digcoll_rw_api_creds_json(self) -> dict:
+        value = os.getenv("DIGCOLL_RW_API_CREDS_JSON")
         if not value:
-            raise ValueError("Env var 'DIGCOLL_RW_API_CREDENTIALS_JSON' must be defined")
+            raise ValueError("Env var 'DIGCOLL_RW_API_CREDS_JSON' must be defined")
         return json.loads(value)
 
     @property
-    def openschol_rw_api_credentials_json(self) -> dict:
-        value = os.getenv("OPENSCHOL_RW_API_CREDENTIALS_JSON")
+    def openschol_rw_api_creds_json(self) -> dict:
+        value = os.getenv("OPENSCHOL_RW_API_CREDS_JSON")
         if not value:
-            raise ValueError(
-                "Env var 'OPENSCHOL_RW_API_CREDENTIALS_JSON' must be defined"
-            )
+            raise ValueError("Env var 'OPENSCHOL_RW_API_CREDS_JSON' must be defined")
         return json.loads(value)
 
     @property
@@ -100,9 +98,9 @@ class Config:
             * DDC-8 -> Digital Collections
         """
         if submission_system in ("DSpace@MIT", "IR-8"):
-            return self.openschol_rw_api_credentials_json
+            return self.openschol_rw_api_creds_json
         if submission_system == "DDC-8":
-            return self.digcoll_rw_api_credentials_json
+            return self.digcoll_rw_api_creds_json
 
         raise ValueError(
             f"'submission_system' should be one of ['DSpace@MIT','IR-8', 'DDC-8'], got '{submission_system}'"  # noqa: E501
