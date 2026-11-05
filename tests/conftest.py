@@ -80,7 +80,7 @@ def mocked_dspace():
                 },
             },
         )
-        m.delete("mock://dspace.edu/server/api/core/items/item01", status_code=200)
+        m.delete("mock://dspace.edu/server/api/core/items/item01", status_code=204)
         m.post(
             "mock://dspace.edu/server/api/core/items/item01/bundles",
             json={

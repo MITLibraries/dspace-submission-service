@@ -598,13 +598,30 @@ class Submission:
             )
 
     def clean_up_partial_success(self, item: Item) -> None:
+        """Attempt to delete a partially posted item.
+
+        A failed delete is logged as an error requesting manual removal. The error
+        that caused the partial success remains reported in the submission's error result,
+        as it reports the original failure.
+        """
         handle = item.handle
-        logger.info("Item '%s' was partially posted to DSpace, cleaning up", item.handle)
+        identifier = handle or item.uuid
+        logger.info("Item '%s' was partially posted to DSpace, cleaning up", identifier)
         try:
-            self.client.delete_dso(item)
-            logger.info("Item '%s' deleted from DSpace", handle)
+            response = self.client.delete_dso(item)
         except Exception:
-            logger.exception("Failed to delete DSpace item '%s'", handle)
+            logger.exception("Failed to delete DSpace item '%s'", identifier)
+            response = None
+
+        if response is None:
+            logger.error(
+                "Item '%s' (uuid %s) could not be deleted and may remain in DSpace; "
+                "it requires manual removal",
+                identifier,
+                item.uuid,
+            )
+            return
+        logger.info("Item '%s' deleted from DSpace", identifier)
 
 
 def prettify(traceback: list) -> list[str]:

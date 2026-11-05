@@ -5,6 +5,7 @@ import traceback
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 from dspace_rest_client.client import DSpaceClient
 from dspace_rest_client.models import Bitstream, Bundle, Item
 from freezegun import freeze_time
@@ -403,3 +404,32 @@ def test_update_item_bitstream_undo_fails_to_restore_item_state_raise_error(
 
     mock_undo_bitstream_updates.assert_called_once()
     mock_delete_old_item_bitstream.assert_not_called()
+
+
+@patch("submitter.submission.DSpaceClient.delete_dso")
+def test_clean_up_partial_success_non_204_delete_logs_error(
+    mock_delete_dso, dspace_submission_instance, caplog
+):
+    # delete_dso returns None (no exception) when DSpace responds with non-204
+    mock_delete_dso.return_value = None
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+
+    with caplog.at_level("INFO"):
+        dspace_submission_instance.clean_up_partial_success(item)
+
+    assert "could not be deleted and may remain in DSpace" in caplog.text
+    assert "deleted from DSpace" not in caplog.text
+
+
+@patch("submitter.submission.DSpaceClient.delete_dso")
+def test_clean_up_partial_success_204_delete_logs_success(
+    mock_delete_dso, dspace_submission_instance, caplog
+):
+    mock_delete_dso.return_value = requests.Response()
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+
+    with caplog.at_level("INFO"):
+        dspace_submission_instance.clean_up_partial_success(item)
+
+    assert "Item '0000/item01' deleted from DSpace" in caplog.text
+    assert "Failed to delete" not in caplog.text
