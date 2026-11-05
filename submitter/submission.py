@@ -25,6 +25,38 @@ CONFIG = Config()
 # Shared cache for DSpace clients across all Submission instances
 dspace_clients: dict[str, DSpaceClient] = {}
 
+# Maximum number of characters of a DSpace response body written to the logs
+DSPACE_RESPONSE_LOG_MAX_CHARS = 2000
+
+
+def track_last_response(client: DSpaceClient) -> None:
+    """Record the most recent HTTP response received by a DSpace client.
+
+    The DSpace client returns responses rather than raising on error status codes,
+    so the response from a failed operation is otherwise not available to report.
+    """
+
+    def record(response: requests.Response, **_kwargs: object) -> requests.Response:
+        client.last_response = response  # type: ignore[attr-defined]
+        return response
+
+    client.session.hooks["response"].append(record)
+
+
+def log_dspace_response(exception: errors.SubmissionError) -> None:
+    """Log the DSpace response body attached to a SubmissionError, if any.
+
+    The body is collapsed to a single line and truncated so that large HTML or
+    stack trace responses do not flood the logs.
+    """
+    dspace_error = getattr(exception, "dspace_error", None)
+    if not dspace_error:
+        return
+    body = " ".join(str(dspace_error).split())
+    if len(body) > DSPACE_RESPONSE_LOG_MAX_CHARS:
+        body = f"{body[:DSPACE_RESPONSE_LOG_MAX_CHARS]}... [truncated]"
+    logger.error("DSpace response body: %s", body)
+
 
 class ValidItemOperations(StrEnum):
     CREATE = "create"
@@ -127,6 +159,7 @@ class Submission:
             password=credentials["password"],
             fake_user_agent=True,
         )
+        track_last_response(client)
         # add custom request headers
         # NOTE: Remove after header management has been standardized in
         #       the 3rd party dspace-rest-python client
@@ -201,6 +234,13 @@ class Submission:
             files=message_body["Files"],
         )
 
+    def _failed_dspace_response(self) -> str | None:
+        """Return the body of the last DSpace response if it was an error status."""
+        response = getattr(self.client, "last_response", None)
+        if response is None or response.ok:
+            return None
+        return response.text
+
     def _submit_item(self) -> tuple[Item, Bundle]:
         """Submit item instance from submission message.
 
@@ -213,10 +253,11 @@ class Submission:
         if self.operation == ValidItemOperations.UPDATE:
             try:
                 item, bundle = self._update_item()
-            except errors.SubmissionError:
+            except errors.SubmissionError as exception:
                 logger.exception(
                     f"Error occurred while updating item '{self.item_handle}'"
                 )
+                log_dspace_response(exception)
                 raise
         elif self.operation == ValidItemOperations.CREATE:
             try:
@@ -224,11 +265,12 @@ class Submission:
                 bundle = self._create_bundle(item)
                 for bitstream_uri in self.files or []:
                     self._create_bitstream(item, bundle, bitstream_uri)
-            except errors.SubmissionError:
+            except errors.SubmissionError as exception:
                 logger.exception(
                     "Error occurred while creating item with PackageID="
                     f"{self.result_attributes.get('PackageID', {}).get('StringValue', 'unknown')}"  # noqa: E501
                 )
+                log_dspace_response(exception)
                 raise
         else:
             raise errors.SubmissionError(f"Operation not recognized: {self.operation}")
@@ -287,7 +329,9 @@ class Submission:
         # is updated to raise exceptions.
         if item.handle is None:
             raise errors.ItemError(
-                f"Error occurred while creating item from file '{self.metadata_location}'"
+                "Error occurred while creating item from file "
+                f"'{self.metadata_location}'",
+                dspace_response=self._failed_dspace_response(),
             )
 
         logger.info(f"Item created with handle: {item.handle}")
@@ -311,10 +355,13 @@ class Submission:
         # Bundle object's uuid is None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bundle.uuid is None:
+            # Capture the response before cleanup issues further requests
+            dspace_response = self._failed_dspace_response()
             self.clean_up_partial_success(item)
             raise errors.BundleError(
                 f"Error occurred while creating bundle for item '{item.handle}' "
-                "in DSpace. Item and any bitstreams already posted to it will be deleted"
+                "in DSpace. Item and any bitstreams already posted to it will be deleted",
+                dspace_response=dspace_response,
             )
 
         logger.info(f"Bundle created with UUID: {bundle.uuid}")
@@ -342,12 +389,15 @@ class Submission:
         # returns None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bitstream is None:
+            # Capture the response before cleanup issues further requests
+            dspace_response = self._failed_dspace_response()
             self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
                     "Error occurred while creating bitstream from file "
                     f"'{bitstream_data['BitstreamName']}' for item '{item.handle}'"
                 ),
+                dspace_response=dspace_response,
             )
 
         logger.info(f"Bitstream created with UUID: {bitstream.uuid}")

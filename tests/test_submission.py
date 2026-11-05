@@ -2,17 +2,27 @@
 import re
 import sys
 import traceback
+from http import HTTPStatus
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+import requests_mock
 from dspace_rest_client.client import DSpaceClient
 from dspace_rest_client.models import Bitstream, Bundle, Item
 from freezegun import freeze_time
 from requests.exceptions import RequestException
 
 from submitter import errors
-from submitter.submission import Submission, dspace_clients, prettify
+from submitter.submission import (
+    DSPACE_RESPONSE_LOG_MAX_CHARS,
+    Submission,
+    dspace_clients,
+    log_dspace_response,
+    prettify,
+    track_last_response,
+)
 
 
 def test_dspace_client_cache_stores_by_destination(
@@ -433,3 +443,114 @@ def test_clean_up_partial_success_204_delete_logs_success(
 
     assert "Item '0000/item01' deleted from DSpace" in caplog.text
     assert "Failed to delete" not in caplog.text
+
+
+def test_log_dspace_response_logs_body(caplog):
+    exception = errors.SubmissionError("A test error")
+    exception.dspace_error = "line one\n  line two"
+    with caplog.at_level("ERROR"):
+        log_dspace_response(exception)
+    assert "DSpace response body: line one line two" in caplog.text
+
+
+def test_log_dspace_response_truncates_long_body(caplog):
+    exception = errors.SubmissionError("A test error")
+    exception.dspace_error = "x" * (DSPACE_RESPONSE_LOG_MAX_CHARS + 500)
+    with caplog.at_level("ERROR"):
+        log_dspace_response(exception)
+    assert "x" * DSPACE_RESPONSE_LOG_MAX_CHARS + "... [truncated]" in caplog.text
+    assert "x" * (DSPACE_RESPONSE_LOG_MAX_CHARS + 1) not in caplog.text
+
+
+def test_log_dspace_response_no_body_logs_nothing(caplog):
+    with caplog.at_level("ERROR"):
+        log_dspace_response(errors.SubmissionError("A test error"))
+    assert "DSpace response body" not in caplog.text
+
+
+@patch("submitter.submission.DSpaceClient.create_bundle")
+def test_submit_item_error_logs_dspace_response_body(
+    mock_create_bundle, dspace_submission_instance, caplog
+):
+    response = requests.Response()
+    response.status_code = 500
+    response._content = b"DSpace internal failure details"
+    mock_create_bundle.side_effect = requests.HTTPError(response=response)
+    with caplog.at_level("ERROR"), pytest.raises(errors.BundleError):
+        dspace_submission_instance._submit_item()
+    assert "DSpace response body: DSpace internal failure details" in caplog.text
+
+
+def test_track_last_response_records_latest_response():
+    client = SimpleNamespace(session=requests.Session())
+    track_last_response(client)
+    with requests_mock.Mocker() as m:
+        m.get("mock://dspace.edu/ok", status_code=200, text="fine")
+        m.get("mock://dspace.edu/fail", status_code=500, text="broken")
+        client.session.get("mock://dspace.edu/ok")
+        assert client.last_response.status_code == HTTPStatus.OK
+        client.session.get("mock://dspace.edu/fail")
+        assert client.last_response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+        assert client.last_response.text == "broken"
+
+
+def test_failed_dspace_response_returns_none_for_success(dspace_submission_instance):
+    response = requests.Response()
+    response.status_code = 201
+    dspace_submission_instance.client.last_response = response
+    assert dspace_submission_instance._failed_dspace_response() is None
+
+
+def test_failed_dspace_response_returns_body_for_error(dspace_submission_instance):
+    response = requests.Response()
+    response.status_code = 500
+    response._content = b"server exploded"
+    dspace_submission_instance.client.last_response = response
+    assert dspace_submission_instance._failed_dspace_response() == "server exploded"
+
+
+def test_create_item_error_includes_dspace_response(
+    mocked_dspace, dspace_submission_instance, caplog
+):
+    track_last_response(dspace_submission_instance.client)
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/items",
+        status_code=500,
+        text="item creation failed",
+    )
+    with caplog.at_level("ERROR"), pytest.raises(errors.ItemError) as exc_info:
+        dspace_submission_instance._submit_item()
+    assert exc_info.value.dspace_error == "item creation failed"
+    assert "DSpace response body: item creation failed" in caplog.text
+
+
+def test_create_bundle_error_includes_dspace_response(
+    mocked_dspace, dspace_submission_instance, caplog
+):
+    track_last_response(dspace_submission_instance.client)
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/items/item01/bundles",
+        status_code=500,
+        text="bundle creation failed",
+    )
+    with caplog.at_level("ERROR"), pytest.raises(errors.BundleError) as exc_info:
+        dspace_submission_instance._submit_item()
+    assert exc_info.value.dspace_error == "bundle creation failed"
+    assert "DSpace response body: bundle creation failed" in caplog.text
+
+
+@patch("submitter.submission.DSpaceClient.create_bitstream")
+def test_create_bitstream_error_includes_dspace_response(
+    mock_create_bitstream, mocked_dspace, dspace_submission_instance, caplog
+):
+    def failing_create_bitstream(*_args, **_kwargs):
+        response = requests.Response()
+        response.status_code = 500
+        response._content = b"bitstream upload failed"
+        dspace_submission_instance.client.last_response = response
+
+    mock_create_bitstream.side_effect = failing_create_bitstream
+    with caplog.at_level("ERROR"), pytest.raises(errors.BitstreamError) as exc_info:
+        dspace_submission_instance._submit_item()
+    assert exc_info.value.dspace_error == "bitstream upload failed"
+    assert "DSpace response body: bitstream upload failed" in caplog.text
