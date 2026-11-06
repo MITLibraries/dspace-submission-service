@@ -30,11 +30,18 @@ class InvalidDSpaceDestinationError(Exception):
 
 
 class SubmissionError(Exception):
-    def __init__(self, message: str, exception: Exception | None = None):
+    def __init__(
+        self,
+        message: str,
+        exception: Exception | None = None,
+        dspace_response: str | None = None,
+    ):
         super().__init__(message)
         self.exception = exception
 
-        if (
+        if dspace_response is not None:
+            self.dspace_error = dspace_response
+        elif (
             isinstance(self.exception, RequestException)
             and self.exception.response is not None
         ):
