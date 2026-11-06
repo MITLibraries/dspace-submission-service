@@ -520,6 +520,29 @@ def test_create_item_error_includes_dspace_response(
     assert "DSpace response body: item creation failed" in caplog.text
 
 
+@patch("submitter.submission.DSpaceClient.create_item")
+def test_create_item_exception_includes_dspace_response(
+    mock_create_item, mocked_dspace, dspace_submission_instance
+):
+    track_last_response(dspace_submission_instance.client)
+
+    def failing_create_item(**_kwargs):
+        dspace_submission_instance.client.session.post(
+            "mock://dspace.edu/server/api/core/items"
+        )
+        raise RuntimeError("connection reset")
+
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/items",
+        status_code=500,
+        text="item creation rejected",
+    )
+    mock_create_item.side_effect = failing_create_item
+    with pytest.raises(errors.ItemError) as exc_info:
+        dspace_submission_instance._create_item()
+    assert exc_info.value.dspace_error == "item creation rejected"
+
+
 def test_create_bundle_error_includes_dspace_response(
     mocked_dspace, dspace_submission_instance, caplog
 ):

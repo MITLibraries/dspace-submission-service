@@ -346,6 +346,7 @@ class Submission:
                     f"'{self.metadata_location}'"
                 ),
                 exception=exception,
+                dspace_response=self._failed_dspace_response(),
             ) from exception
 
         # NOTE: This check is added to raise an exception when the returned
