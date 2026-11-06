@@ -43,13 +43,12 @@ def track_last_response(client: DSpaceClient) -> None:
     client.session.hooks["response"].append(record)
 
 
-def log_dspace_response(exception: errors.SubmissionError) -> None:
-    """Log the DSpace response body attached to a SubmissionError, if any.
+def log_dspace_response(dspace_error: str | None) -> None:
+    """Log a DSpace response body, if any.
 
     The body is collapsed to a single line and truncated so that large HTML or
     stack trace responses do not flood the logs.
     """
-    dspace_error = getattr(exception, "dspace_error", None)
     if not dspace_error:
         return
     body = " ".join(str(dspace_error).split())
@@ -241,6 +240,31 @@ class Submission:
             return None
         return response.text
 
+    def _reset_last_response(self) -> None:
+        """Clear the recorded DSpace response before a call that may fail.
+
+        Without this, a failure that raises before any response is received would
+        report the body of an unrelated earlier response.
+        """
+        self.client.last_response = None  # type: ignore[attr-defined]
+
+    def _add_provenance_entry(self, item: Item, value: str) -> None:
+        """Add a provenance entry to an item.
+
+        Raises an ItemError carrying the DSpace response body if DSpace rejects the
+        update. The item may be partially updated when this is raised.
+        """
+        self._reset_last_response()
+        self.client.add_metadata(item, field="dc.description.provenance", value=value)
+        dspace_response = self._failed_dspace_response()
+        if dspace_response is not None:
+            raise errors.ItemError(
+                f"Error occurred while adding provenance entry to item '{item.handle}'; "
+                "the item may be partially updated, please verify in DSpace and edit if "
+                "necessary",
+                dspace_response=dspace_response,
+            )
+
     def _submit_item(self) -> tuple[Item, Bundle]:
         """Submit item instance from submission message.
 
@@ -257,7 +281,7 @@ class Submission:
                 logger.exception(
                     f"Error occurred while updating item '{self.item_handle}'"
                 )
-                log_dspace_response(exception)
+                log_dspace_response(getattr(exception, "dspace_error", None))
                 raise
         elif self.operation == ValidItemOperations.CREATE:
             try:
@@ -270,7 +294,7 @@ class Submission:
                     "Error occurred while creating item with PackageID="
                     f"{self.result_attributes.get('PackageID', {}).get('StringValue', 'unknown')}"  # noqa: E501
                 )
-                log_dspace_response(exception)
+                log_dspace_response(getattr(exception, "dspace_error", None))
                 raise
         else:
             raise errors.SubmissionError(f"Operation not recognized: {self.operation}")
@@ -339,9 +363,12 @@ class Submission:
 
     def _create_bundle(self, item: Item) -> Bundle:
         """Create ORIGINAL bundle for a specified item."""
+        self._reset_last_response()
         try:
             bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
         except Exception as exception:
+            # Capture the response before cleanup issues further requests
+            dspace_response = self._failed_dspace_response()
             self.clean_up_partial_success(item)
             raise errors.BundleError(
                 (
@@ -349,6 +376,7 @@ class Submission:
                     "in DSpace. Item and any bitstreams already posted to it will be deleted"  # noqa: E501
                 ),
                 exception=exception,
+                dspace_response=dspace_response,
             ) from exception
 
         # NOTE: This check is added to raise an exception when the returned
@@ -369,6 +397,7 @@ class Submission:
 
     def _create_bitstream(self, item: Item, bundle: Bundle, bitstream_data: dict) -> None:
         """Create bitstream for a specified item bundle."""
+        self._reset_last_response()
         try:
             bitstream = self.client.create_bitstream(
                 bundle=bundle,
@@ -376,6 +405,8 @@ class Submission:
                 path=bitstream_data["FileLocation"],
             )
         except Exception as exception:
+            # Capture the response before cleanup issues further requests
+            dspace_response = self._failed_dspace_response()
             self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
@@ -383,6 +414,7 @@ class Submission:
                     f"'{bitstream_data['BitstreamName']}' for item '{item.handle}'"
                 ),
                 exception=exception,
+                dspace_response=dspace_response,
             ) from exception
 
         # NOTE: This check is added to raise an exception when the client
@@ -438,10 +470,9 @@ class Submission:
         new_bitstreams = self._upload_new_item_bitstreams(item, bundle)
 
         # add metadata entry for successfully added bitstreams
-        self.client.add_metadata(
+        self._add_provenance_entry(
             item,
-            field="dc.description.provenance",
-            value=(
+            (
                 f"Updated bitstreams on {time}: "
                 f"{[bitstream.name for bitstream in new_bitstreams]}"
             ),
@@ -451,10 +482,8 @@ class Submission:
         # add metadata entry for deleted bitstream
         if old_bitstream is not None:
             self._delete_old_item_bitstream(item, old_bitstream)
-            self.client.add_metadata(
-                item,
-                field="dc.description.provenance",
-                value=(f"Deleted bitstream on {time}: {old_bitstream.name}"),
+            self._add_provenance_entry(
+                item, f"Deleted bitstream on {time}: {old_bitstream.name}"
             )
 
         return bundle
@@ -498,9 +527,12 @@ class Submission:
 
         added_bitstreams: list[Bitstream] = []
         failed_bitstreams: list[str] = []
+        # Keep the first failing response body, which is most likely the root cause
+        dspace_response: str | None = None
 
         # update 'ORIGINAL' bundle with new bitstreams
         for bitstream_uri in self.files:
+            self._reset_last_response()
             try:
                 bitstream = self.client.create_bitstream(
                     bundle=bundle,
@@ -509,11 +541,13 @@ class Submission:
                 )
             except Exception:  # noqa: BLE001
                 failed_bitstreams.append(bitstream_uri["BitstreamName"])
+                dspace_response = dspace_response or self._failed_dspace_response()
                 continue
             else:
                 # NOTE: This check is added because the client can return None
                 if bitstream is None:
                     failed_bitstreams.append(bitstream_uri["BitstreamName"])
+                    dspace_response = dspace_response or self._failed_dspace_response()
                 else:
                     added_bitstreams.append(bitstream)
 
@@ -524,6 +558,7 @@ class Submission:
                         f"Error occurred while creating bitstream(s) for item {item.handle} "  # noqa: E501
                         f"with the following files: {failed_bitstreams}; "
                     ),
+                    dspace_response=dspace_response,
                 )
             remaining_bitstreams = self._undo_bitstream_updates(added_bitstreams)
             if len(remaining_bitstreams) > 0:
@@ -535,6 +570,7 @@ class Submission:
                         "Please delete the following bitstreams to restore item state: "
                         f"{remaining_bitstreams}"
                     ),
+                    dspace_response=dspace_response,
                 )
             raise errors.BitstreamError(
                 (
@@ -542,6 +578,7 @@ class Submission:
                     f"with the following files: {failed_bitstreams}; "
                     "restored item to original state."
                 ),
+                dspace_response=dspace_response,
             )
 
         return added_bitstreams
@@ -553,7 +590,8 @@ class Submission:
             raise errors.BitstreamError(
                 f"Error occurred while deleting original bitstream "
                 f"'{bitstream.name}' for item '{item.handle}'. "
-                f"Please delete this file to complete item update."
+                f"Please delete this file to complete item update.",
+                dspace_response=getattr(exception, "dspace_error", None),
             ) from exception
 
     def _undo_bitstream_updates(self, bitstreams: list[Bitstream]) -> list[Bitstream]:
@@ -576,8 +614,9 @@ class Submission:
             try:
                 self._delete_bitstream(bitstream)
                 deleted_bitstreams.append(bitstream)
-            except errors.BitstreamError:
+            except errors.BitstreamError as exception:
                 logger.exception("Error occurred while undoing bitstream update")
+                log_dspace_response(getattr(exception, "dspace_error", None))
 
         return list(set(bitstreams) - set(deleted_bitstreams))
 
@@ -606,7 +645,8 @@ class Submission:
         if response.status_code != 204:  # noqa: PLR2004
             raise errors.BitstreamError(
                 f"Error occurred while deleting bitstream {bitstream.uuid}: "
-                f"{response.status_code} {response.text}"
+                f"{response.status_code} {response.text}",
+                dspace_response=response.text,
             )
 
         logger.info(
@@ -657,6 +697,7 @@ class Submission:
         handle = item.handle
         identifier = handle or item.uuid
         logger.info("Item '%s' was partially posted to DSpace, cleaning up", identifier)
+        self._reset_last_response()
         try:
             response = self.client.delete_dso(item)
         except Exception:
@@ -670,6 +711,7 @@ class Submission:
                 identifier,
                 item.uuid,
             )
+            log_dspace_response(self._failed_dspace_response())
             return
         logger.info("Item '%s' deleted from DSpace", identifier)
 

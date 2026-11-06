@@ -446,25 +446,21 @@ def test_clean_up_partial_success_204_delete_logs_success(
 
 
 def test_log_dspace_response_logs_body(caplog):
-    exception = errors.SubmissionError("A test error")
-    exception.dspace_error = "line one\n  line two"
     with caplog.at_level("ERROR"):
-        log_dspace_response(exception)
+        log_dspace_response("line one\n  line two")
     assert "DSpace response body: line one line two" in caplog.text
 
 
 def test_log_dspace_response_truncates_long_body(caplog):
-    exception = errors.SubmissionError("A test error")
-    exception.dspace_error = "x" * (DSPACE_RESPONSE_LOG_MAX_CHARS + 500)
     with caplog.at_level("ERROR"):
-        log_dspace_response(exception)
+        log_dspace_response("x" * (DSPACE_RESPONSE_LOG_MAX_CHARS + 500))
     assert "x" * DSPACE_RESPONSE_LOG_MAX_CHARS + "... [truncated]" in caplog.text
     assert "x" * (DSPACE_RESPONSE_LOG_MAX_CHARS + 1) not in caplog.text
 
 
 def test_log_dspace_response_no_body_logs_nothing(caplog):
     with caplog.at_level("ERROR"):
-        log_dspace_response(errors.SubmissionError("A test error"))
+        log_dspace_response(None)
     assert "DSpace response body" not in caplog.text
 
 
@@ -554,3 +550,303 @@ def test_create_bitstream_error_includes_dspace_response(
         dspace_submission_instance._submit_item()
     assert exc_info.value.dspace_error == "bitstream upload failed"
     assert "DSpace response body: bitstream upload failed" in caplog.text
+
+
+def test_reset_last_response_clears_stale_failure(dspace_submission_instance):
+    response = requests.Response()
+    response.status_code = 500
+    response._content = b"stale failure"
+    dspace_submission_instance.client.last_response = response
+    dspace_submission_instance._reset_last_response()
+    assert dspace_submission_instance._failed_dspace_response() is None
+
+
+def test_upload_new_item_bitstreams_failure_includes_dspace_response(
+    mocked_dspace, dspace_submission_instance
+):
+    track_last_response(dspace_submission_instance.client)
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams",
+        status_code=500,
+        text="bitstream upload rejected",
+    )
+    bundle = Bundle(api_resource={"uuid": "bundle01", "name": "ORIGINAL"})
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+    with pytest.raises(errors.BitstreamError) as exc_info:
+        dspace_submission_instance._upload_new_item_bitstreams(item, bundle)
+    assert exc_info.value.dspace_error == "bitstream upload rejected"
+
+
+def test_upload_new_item_bitstreams_undo_failure_keeps_dspace_response(
+    dspace_submission_instance,
+):
+    bitstream = SimpleNamespace(name="test-file-01.pdf")
+    dspace_submission_instance.files = [
+        {
+            "BitstreamName": "test-file-01.pdf",
+            "FileLocation": "tests/fixtures/test-file-01.pdf",
+        },
+        {
+            "BitstreamName": "test-file-02.pdf",
+            "FileLocation": "tests/fixtures/test-file-01.pdf",
+        },
+    ]
+    response = requests.Response()
+    response.status_code = 500
+    response._content = b"second upload failed"
+
+    def create_bitstream(**kwargs):
+        if kwargs["name"] == "test-file-01.pdf":
+            return bitstream
+        dspace_submission_instance.client.last_response = response
+        return None
+
+    bundle = Bundle(api_resource={"uuid": "bundle01", "name": "ORIGINAL"})
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+    with (
+        patch.object(
+            dspace_submission_instance.client,
+            "create_bitstream",
+            side_effect=create_bitstream,
+        ),
+        patch.object(
+            dspace_submission_instance,
+            "_undo_bitstream_updates",
+            return_value=[],
+        ),
+        pytest.raises(errors.BitstreamError) as exc_info,
+    ):
+        dspace_submission_instance._upload_new_item_bitstreams(item, bundle)
+    assert exc_info.value.dspace_error == "second upload failed"
+
+
+@patch("submitter.submission.DSpaceClient.api_delete")
+def test_delete_bitstream_non_204_includes_dspace_response(
+    mock_api_delete, dspace_submission_instance
+):
+    response = requests.Response()
+    response.status_code = 500
+    response._content = b"delete refused"
+    mock_api_delete.return_value = response
+    bitstream = SimpleNamespace(
+        links={"self": {"href": "mock://dspace.edu/bitstreams/bs01"}},
+        uuid="bs01",
+        name="test-file-01.pdf",
+    )
+    with pytest.raises(errors.BitstreamError) as exc_info:
+        dspace_submission_instance._delete_bitstream(bitstream)
+    assert exc_info.value.dspace_error == "delete refused"
+
+
+@patch("submitter.submission.Submission._delete_bitstream")
+def test_delete_old_item_bitstream_preserves_dspace_response(
+    mock_delete_bitstream, dspace_submission_instance
+):
+    mock_delete_bitstream.side_effect = errors.BitstreamError(
+        "delete failed", dspace_response="original delete body"
+    )
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+    bitstream = SimpleNamespace(name="old.pdf", uuid="bs01")
+    with pytest.raises(errors.BitstreamError) as exc_info:
+        dspace_submission_instance._delete_old_item_bitstream(item, bitstream)
+    assert exc_info.value.dspace_error == "original delete body"
+
+
+@patch("submitter.submission.Submission._delete_bitstream")
+def test_undo_bitstream_updates_logs_dspace_response(
+    mock_delete_bitstream, dspace_submission_instance, caplog
+):
+    mock_delete_bitstream.side_effect = errors.BitstreamError(
+        "delete failed", dspace_response="undo delete body"
+    )
+    bitstream = Bitstream(api_resource={"uuid": "bs02", "name": "new.pdf"})
+    with caplog.at_level("ERROR"):
+        remaining = dspace_submission_instance._undo_bitstream_updates([bitstream])
+    assert remaining == [bitstream]
+    assert "DSpace response body: undo delete body" in caplog.text
+
+
+def test_clean_up_partial_success_non_204_logs_dspace_response(
+    mocked_dspace, dspace_submission_instance, caplog
+):
+    track_last_response(dspace_submission_instance.client)
+    mocked_dspace.delete(
+        "mock://dspace.edu/server/api/core/items/item01",
+        status_code=500,
+        text="item delete rejected",
+    )
+    item = Item(
+        {
+            "handle": "0000/item01",
+            "uuid": "item01",
+            "_links": {
+                "self": {"href": "mock://dspace.edu/server/api/core/items/item01"}
+            },
+        }
+    )
+    with caplog.at_level("ERROR"):
+        dspace_submission_instance.clean_up_partial_success(item)
+    assert "may remain in DSpace" in caplog.text
+    assert "DSpace response body: item delete rejected" in caplog.text
+
+
+def test_clean_up_partial_success_exception_does_not_log_stale_body(
+    dspace_submission_instance, caplog
+):
+    stale = requests.Response()
+    stale.status_code = 500
+    stale._content = b"stale body"
+    dspace_submission_instance.client.last_response = stale
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+    with (
+        patch(
+            "submitter.submission.DSpaceClient.delete_dso",
+            side_effect=RequestException("connection dropped"),
+        ),
+        caplog.at_level("ERROR"),
+    ):
+        dspace_submission_instance.clean_up_partial_success(item)
+    assert "may remain in DSpace" in caplog.text
+    assert "stale body" not in caplog.text
+
+
+def test_add_provenance_entry_raises_with_dspace_response_on_failure(
+    mocked_dspace, dspace_submission_instance
+):
+    track_last_response(dspace_submission_instance.client)
+    mocked_dspace.patch(
+        "mock://dspace.edu/server/api/core/items/item01",
+        status_code=500,
+        text="provenance rejected",
+    )
+    item = Item(
+        {
+            "handle": "0000/item01",
+            "uuid": "item01",
+            "_links": {
+                "self": {"href": "mock://dspace.edu/server/api/core/items/item01"}
+            },
+        }
+    )
+    with pytest.raises(errors.ItemError) as exc_info:
+        dspace_submission_instance._add_provenance_entry(item, "Deleted bitstream")
+    assert "Error occurred while adding provenance entry to item '0000/item01'" in str(
+        exc_info.value
+    )
+    assert exc_info.value.dspace_error == "provenance rejected"
+
+
+@patch("submitter.submission.Submission._delete_old_item_bitstream")
+@patch("submitter.submission.Submission._upload_new_item_bitstreams")
+@patch("submitter.submission.Submission._get_item_bitstream_bundle")
+@patch("submitter.submission.DSpaceClient.add_metadata")
+def test_update_item_bitstream_provenance_failure_stops_update(
+    mock_add_metadata,
+    mock_get_bundle,
+    mock_upload,
+    mock_delete_old,
+    dspace_submission_instance,
+):
+    old_bitstream = SimpleNamespace(name="old.pdf")
+    bundle = Bundle(api_resource={"uuid": "bundle01", "name": "ORIGINAL"})
+    mock_get_bundle.return_value = (old_bitstream, bundle)
+    mock_upload.return_value = [SimpleNamespace(name="new.pdf")]
+    mock_add_metadata.side_effect = lambda *_args, **_kwargs: None
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+    with (
+        patch.object(
+            dspace_submission_instance,
+            "_failed_dspace_response",
+            return_value="provenance rejected",
+        ),
+        pytest.raises(errors.ItemError),
+    ):
+        dspace_submission_instance._update_item_bitstream(item)
+    mock_delete_old.assert_not_called()
+
+
+def test_add_provenance_entry_success_logs_nothing(
+    mocked_dspace, dspace_submission_instance, caplog
+):
+    track_last_response(dspace_submission_instance.client)
+    mocked_dspace.patch(
+        "mock://dspace.edu/server/api/core/items/item01",
+        status_code=200,
+        json={"type": "item", "id": "item01", "handle": "0000/item01"},
+    )
+    item = Item(
+        {
+            "handle": "0000/item01",
+            "uuid": "item01",
+            "_links": {
+                "self": {"href": "mock://dspace.edu/server/api/core/items/item01"}
+            },
+        }
+    )
+    with caplog.at_level("ERROR"):
+        dspace_submission_instance._add_provenance_entry(item, "Deleted bitstream")
+    assert "DSpace response body" not in caplog.text
+
+
+@patch("submitter.submission.DSpaceClient.create_bundle")
+def test_create_bundle_exception_includes_dspace_response(
+    mock_create_bundle, dspace_submission_instance, mocked_dspace
+):
+    track_last_response(dspace_submission_instance.client)
+
+    def failing_create_bundle(**_kwargs):
+        # Simulate a failed request, then an exception raised without a response body
+        dspace_submission_instance.client.session.post(
+            "mock://dspace.edu/server/api/core/items/item01/bundles"
+        )
+        raise RuntimeError("connection reset")
+
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/items/item01/bundles",
+        status_code=500,
+        text="bundle creation rejected",
+    )
+    mock_create_bundle.side_effect = failing_create_bundle
+    mocked_dspace.delete(
+        "mock://dspace.edu/server/api/core/items/item01", status_code=204
+    )
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+    with pytest.raises(errors.BundleError) as exc_info:
+        dspace_submission_instance._create_bundle(item)
+    assert exc_info.value.dspace_error == "bundle creation rejected"
+
+
+@patch("submitter.submission.DSpaceClient.create_bitstream")
+def test_create_bitstream_exception_includes_dspace_response(
+    mock_create_bitstream, dspace_submission_instance, mocked_dspace
+):
+    track_last_response(dspace_submission_instance.client)
+
+    def failing_create_bitstream(**_kwargs):
+        # Simulate a failed request, then an exception raised without a response body
+        dspace_submission_instance.client.session.post(
+            "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams"
+        )
+        raise RuntimeError("connection reset")
+
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/bundles/bundle01/bitstreams",
+        status_code=500,
+        text="bitstream creation rejected",
+    )
+    mock_create_bitstream.side_effect = failing_create_bitstream
+    mocked_dspace.delete(
+        "mock://dspace.edu/server/api/core/items/item01", status_code=204
+    )
+    bundle = Bundle(api_resource={"uuid": "bundle01", "name": "ORIGINAL"})
+    item = Item({"handle": "0000/item01", "uuid": "item01"})
+    with pytest.raises(errors.BitstreamError) as exc_info:
+        dspace_submission_instance._create_bitstream(
+            item,
+            bundle,
+            {
+                "BitstreamName": "test-file-01.pdf",
+                "FileLocation": "tests/fixtures/test-file-01.pdf",
+            },
+        )
+    assert exc_info.value.dspace_error == "bitstream creation rejected"
