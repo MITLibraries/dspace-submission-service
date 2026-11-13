@@ -7,7 +7,7 @@ DATETIME:=$(shell date -u +%Y%m%dT%H%M%SZ)
 ### document.                                                           ###
 ECR_NAME_DEV := dspace-submission-service-dev
 ECR_URL_DEV := 222053980223.dkr.ecr.us-east-1.amazonaws.com/dspace-submission-service-dev
-CPU_ARCH ?= $(shell cat .aws-architecture 2>/dev/null || echo \"linux/amd64\")
+CPU_ARCH ?= $(shell cat .aws-architecture 2>/dev/null || echo "linux/amd64")
 # FUNCTION_DEV := 
 ### End of Terraform-generated header                            ###
 
