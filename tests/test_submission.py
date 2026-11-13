@@ -433,3 +433,82 @@ def test_clean_up_partial_success_204_delete_logs_success(
 
     assert "Item '0000/item01' deleted from DSpace" in caplog.text
     assert "Failed to delete" not in caplog.text
+
+
+def test_dspace_responses_starts_empty(dspace_submission_instance):
+    assert dspace_submission_instance.dspace_responses == {}
+
+
+def test_dspace_response_captured_on_create(dspace_submission_instance):
+    dspace_submission_instance._submit_item()
+    captured = dspace_submission_instance.dspace_responses
+    assert list(captured) == ["create_item", "create_bundle", "create_bitstream"]
+    assert len(captured["create_bitstream"]) == 2  # noqa: PLR2004
+    for entries in captured.values():
+        for entry in entries:
+            assert set(entry) == {"status_code", "url", "method", "elapsed", "body"}
+            assert isinstance(entry["elapsed"], float)
+            assert "/pid/find" not in entry["url"]
+            assert "/authn/" not in entry["url"]
+    assert dspace_submission_instance.client.session.hooks["response"] == []
+
+
+def test_dspace_response_captures_failed_item_create(
+    dspace_submission_instance, mocked_dspace
+):
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/items",
+        status_code=422,
+        text="metadata rejected",
+    )
+    with pytest.raises(errors.ItemError):
+        dspace_submission_instance._submit_item()
+    entry = dspace_submission_instance.dspace_responses["create_item"][0]
+    assert entry["status_code"] == 422  # noqa: PLR2004
+    assert "metadata rejected" in entry["body"]
+
+
+def test_dspace_response_truncates_large_body(dspace_submission_instance, mocked_dspace):
+    mocked_dspace.post(
+        "mock://dspace.edu/server/api/core/items", status_code=500, text="x" * 20000
+    )
+    with pytest.raises(errors.ItemError):
+        dspace_submission_instance._submit_item()
+    body = dspace_submission_instance.dspace_responses["create_item"][0]["body"]
+    assert body.endswith("...[truncated]")
+    assert len(body) < 11000  # noqa: PLR2004
+
+
+def test_dspace_response_not_shared_between_submissions(
+    dspace_submission_instance, dspace_client
+):
+    other = Submission(
+        destination="DSpace@MIT",
+        collection_handle="0000/collection01",
+        metadata_location="tests/fixtures/test-item-metadata.json",
+        files=[],
+        result_queue=None,
+        attributes={},
+    )
+    other.client = dspace_client
+    dspace_submission_instance._submit_item()
+    other._submit_item()
+    assert len(other.dspace_responses["create_item"]) == 1
+    assert len(dspace_submission_instance.dspace_responses["create_item"]) == 1
+
+
+def test_dspace_response_delete_item_recorded_on_cleanup(
+    dspace_submission_instance,
+):
+    dspace_submission_instance.clean_up_partial_success(
+        Item(
+            {
+                "uuid": "item01",
+                "_links": {
+                    "self": {"href": "mock://dspace.edu/server/api/core/items/item01"}
+                },
+            }
+        )
+    )
+    entry = dspace_submission_instance.dspace_responses["delete_item"][0]
+    assert entry["status_code"] == 204  # noqa: PLR2004
