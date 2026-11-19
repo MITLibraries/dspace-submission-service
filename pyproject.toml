@@ -36,7 +36,6 @@ dev = [
     "pytest-env",
     "requests-mock",
     "ruff",
-    "safety",
     "types-requests",
 ]
 

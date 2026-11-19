@@ -15,7 +15,11 @@ from dspace_rest_client.models import Bitstream, Bundle, Item
 
 from submitter import errors
 from submitter.config import Config
-from submitter.dspace_response import DSpaceResponseLabel, capture_responses
+from submitter.dspace_response import (
+    DSpaceResponseLabel,
+    capture_responses,
+    format_response,
+)
 from submitter.message import validate_message
 
 if TYPE_CHECKING:
@@ -91,7 +95,12 @@ class Submission:
 
         # DSpace timeout error, abort
         except requests.exceptions.Timeout as exception:
-            dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
+            dspace_url = self.client.API_ENDPOINT if self.client else "Unknown DSpace URL"
+            logger.error(  # noqa: TRY400
+                "DSpace request timed out for %s (PackageID=%s)",
+                dspace_url,
+                self.result_attributes.get("PackageID", {}).get("StringValue", "unknown"),
+            )
             raise errors.DSpaceTimeoutError(
                 dspace_url, self.result_attributes
             ) from exception
@@ -272,12 +281,17 @@ class Submission:
             ) from exception
 
         try:
-            with self._capture(DSpaceResponseLabel.CREATE_ITEM):
+            with self._capture(DSpaceResponseLabel.CREATE_ITEM) as captured:
                 item = self.client.create_item(
                     parent=collection.uuid,
                     item=Item(item_data),
                 )
         except Exception as exception:
+            self._log_dspace_failure(
+                f"Failed to create item from file '{self.metadata_location}'",
+                captured,
+                exc_info=True,
+            )
             raise errors.ItemError(
                 (
                     "Error occurred while creating item from file "
@@ -290,6 +304,11 @@ class Submission:
         # Item object's handle is None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if item.handle is None:
+            self._log_dspace_failure(
+                f"Failed to create item from file '{self.metadata_location}': "
+                "no handle returned",
+                captured,
+            )
             raise errors.ItemError(
                 f"Error occurred while creating item from file '{self.metadata_location}'"
             )
@@ -300,9 +319,14 @@ class Submission:
     def _create_bundle(self, item: Item) -> Bundle:
         """Create ORIGINAL bundle for a specified item."""
         try:
-            with self._capture(DSpaceResponseLabel.CREATE_BUNDLE):
+            with self._capture(DSpaceResponseLabel.CREATE_BUNDLE) as captured:
                 bundle = self.client.create_bundle(parent=item, name="ORIGINAL")
         except Exception as exception:
+            self._log_dspace_failure(
+                f"Failed to create bundle for item '{item.handle}'",
+                captured,
+                exc_info=True,
+            )
             self.clean_up_partial_success(item)
             raise errors.BundleError(
                 (
@@ -316,6 +340,10 @@ class Submission:
         # Bundle object's uuid is None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bundle.uuid is None:
+            self._log_dspace_failure(
+                f"Failed to create bundle for item '{item.handle}': no UUID returned",
+                captured,
+            )
             self.clean_up_partial_success(item)
             raise errors.BundleError(
                 f"Error occurred while creating bundle for item '{item.handle}' "
@@ -328,13 +356,19 @@ class Submission:
     def _create_bitstream(self, item: Item, bundle: Bundle, bitstream_data: dict) -> None:
         """Create bitstream for a specified item bundle."""
         try:
-            with self._capture(DSpaceResponseLabel.CREATE_BITSTREAM):
+            with self._capture(DSpaceResponseLabel.CREATE_BITSTREAM) as captured:
                 bitstream = self.client.create_bitstream(
                     bundle=bundle,
                     name=os.path.basename(bitstream_data["BitstreamName"]),
                     path=bitstream_data["FileLocation"],
                 )
         except Exception as exception:
+            self._log_dspace_failure(
+                f"Failed to create bitstream '{bitstream_data['BitstreamName']}' "
+                f"for item '{item.handle}'",
+                captured,
+                exc_info=True,
+            )
             self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
@@ -348,6 +382,11 @@ class Submission:
         # returns None. Should be updated if/when dspace-rest-python
         # is updated to raise exceptions.
         if bitstream is None:
+            self._log_dspace_failure(
+                f"Failed to create bitstream '{bitstream_data['BitstreamName']}' "
+                f"for item '{item.handle}': no bitstream returned",
+                captured,
+            )
             self.clean_up_partial_success(item)
             raise errors.BitstreamError(
                 (
@@ -394,28 +433,37 @@ class Submission:
         new_bitstreams = self._upload_new_item_bitstreams(item, bundle)
 
         # add metadata entry for successfully added bitstreams
-        with self._capture(DSpaceResponseLabel.ADD_METADATA):
-            self.client.add_metadata(
-                item,
-                field="dc.description.provenance",
-                value=(
-                    f"Updated bitstreams on {time}: "
-                    f"{[bitstream.name for bitstream in new_bitstreams]}"
-                ),
-            )
+        self._add_provenance_metadata(
+            item,
+            f"Updated bitstreams on {time}: "
+            f"{[bitstream.name for bitstream in new_bitstreams]}",
+        )
 
         # delete original bitstream
         # add metadata entry for deleted bitstream
         if old_bitstream is not None:
             self._delete_old_item_bitstream(item, old_bitstream)
-            with self._capture(DSpaceResponseLabel.ADD_METADATA):
-                self.client.add_metadata(
-                    item,
-                    field="dc.description.provenance",
-                    value=(f"Deleted bitstream on {time}: {old_bitstream.name}"),
-                )
+            self._add_provenance_metadata(
+                item, f"Deleted bitstream on {time}: {old_bitstream.name}"
+            )
 
         return bundle
+
+    def _add_provenance_metadata(self, item: Item, value: str) -> None:
+        """Add a provenance metadata entry to an item, logging any failure."""
+        try:
+            with self._capture(DSpaceResponseLabel.ADD_METADATA) as captured:
+                self.client.add_metadata(
+                    item, field="dc.description.provenance", value=value
+                )
+        except Exception:
+            self._log_dspace_failure(
+                f"Failed to add provenance metadata to item '{item.handle}'",
+                captured,
+                exc_info=True,
+            )
+            raise
+        logger.debug("Added provenance metadata to item '%s'", item.handle)
 
     def _get_original_bundle(self, item: Item) -> Bundle:
         for bundle in self.client.get_bundles_iter(parent=item):
@@ -460,18 +508,31 @@ class Submission:
         # update 'ORIGINAL' bundle with new bitstreams
         for bitstream_uri in self.files:
             try:
-                with self._capture(DSpaceResponseLabel.UPLOAD_NEW_ITEM_BITSTREAMS):
+                with self._capture(
+                    DSpaceResponseLabel.UPLOAD_NEW_ITEM_BITSTREAMS
+                ) as captured:
                     bitstream = self.client.create_bitstream(
                         bundle=bundle,
                         name=os.path.basename(bitstream_uri["BitstreamName"]),
                         path=bitstream_uri["FileLocation"],
                     )
             except Exception:  # noqa: BLE001
+                self._log_dspace_failure(
+                    f"Failed to upload bitstream '{bitstream_uri['BitstreamName']}' "
+                    f"for item '{item.handle}'",
+                    captured,
+                    exc_info=True,
+                )
                 failed_bitstreams.append(bitstream_uri["BitstreamName"])
                 continue
             else:
                 # NOTE: This check is added because the client can return None
                 if bitstream is None:
+                    self._log_dspace_failure(
+                        f"Failed to upload bitstream '{bitstream_uri['BitstreamName']}' "
+                        f"for item '{item.handle}': no bitstream returned",
+                        captured,
+                    )
                     failed_bitstreams.append(bitstream_uri["BitstreamName"])
                 else:
                     added_bitstreams.append(bitstream)
@@ -549,11 +610,17 @@ class Submission:
         This is a temporary workaround until the client is updated or we find an
         alternative way to send requests to DSpace REST API.
         """
+        captured: list[dict] = []
         try:
             bitstream_url = bitstream.links["self"]["href"]
-            with self._capture(DSpaceResponseLabel.DELETE_BITSTREAM):
+            with self._capture(DSpaceResponseLabel.DELETE_BITSTREAM) as captured:
                 response = self.client.api_delete(url=bitstream_url, params=None)
         except ValueError as exception:
+            self._log_dspace_failure(
+                f"Failed to delete bitstream {bitstream.uuid}",
+                captured,
+                exc_info=True,
+            )
             raise errors.BitstreamError(
                 f"Error occurred while deleting bitstream {bitstream.uuid}",
                 exception=exception,
@@ -564,6 +631,11 @@ class Submission:
         # Should be updated if/when dspace-rest-python is
         # updated to raise exceptions.
         if response.status_code != 204:  # noqa: PLR2004
+            self._log_dspace_failure(
+                f"Failed to delete bitstream {bitstream.uuid}: "
+                f"unexpected status {response.status_code}",
+                captured,
+            )
             raise errors.BitstreamError(
                 f"Error occurred while deleting bitstream {bitstream.uuid}: "
                 f"{response.status_code} {response.text}"
@@ -618,23 +690,33 @@ class Submission:
         identifier = handle or item.uuid
         logger.info("Item '%s' was partially posted to DSpace, cleaning up", identifier)
         try:
-            with self._capture(DSpaceResponseLabel.DELETE_ITEM):
+            with self._capture(DSpaceResponseLabel.DELETE_ITEM) as captured:
                 response = self.client.delete_dso(item)
         except Exception:
             logger.exception("Failed to delete DSpace item '%s'", identifier)
             response = None
 
         if response is None:
-            logger.error(
-                "Item '%s' (uuid %s) could not be deleted and may remain in DSpace; "
-                "it requires manual removal",
-                identifier,
-                item.uuid,
+            self._log_dspace_failure(
+                f"Item '{identifier}' (uuid {item.uuid}) could not be deleted and may "
+                "remain in DSpace; it requires manual removal",
+                captured,
             )
             return
         logger.info("Item '%s' deleted from DSpace", identifier)
 
-    def _capture(self, label: DSpaceResponseLabel) -> AbstractContextManager[None]:
+    def _log_dspace_failure(
+        self, message: str, captured: list[dict], *, exc_info: bool = False
+    ) -> None:
+        """Log a failed mutating DSpace call with the responses it produced."""
+        details = (
+            "; ".join(format_response(entry) for entry in captured)
+            if captured
+            else "no DSpace response captured"
+        )
+        logger.error("%s. DSpace response: %s", message, details, exc_info=exc_info)
+
+    def _capture(self, label: DSpaceResponseLabel) -> AbstractContextManager[list[dict]]:
         """Capture DSpace responses made by the client within this context."""
         return capture_responses(self.client.session, self.dspace_responses, label)
 
