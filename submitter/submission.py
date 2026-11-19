@@ -91,7 +91,7 @@ class Submission:
 
         # DSpace timeout error, abort
         except requests.exceptions.Timeout as exception:
-            dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
+            dspace_url = self.client.API_ENDPOINT if self.client else "Unknown DSpace URL"
             raise errors.DSpaceTimeoutError(
                 dspace_url, self.result_attributes
             ) from exception
@@ -394,28 +394,30 @@ class Submission:
         new_bitstreams = self._upload_new_item_bitstreams(item, bundle)
 
         # add metadata entry for successfully added bitstreams
-        with self._capture(DSpaceResponseLabel.ADD_METADATA):
-            self.client.add_metadata(
-                item,
-                field="dc.description.provenance",
-                value=(
-                    f"Updated bitstreams on {time}: "
-                    f"{[bitstream.name for bitstream in new_bitstreams]}"
-                ),
-            )
+        self._add_provenance_metadata(
+            item,
+            f"Updated bitstreams on {time}: "
+            f"{[bitstream.name for bitstream in new_bitstreams]}",
+        )
 
         # delete original bitstream
         # add metadata entry for deleted bitstream
         if old_bitstream is not None:
             self._delete_old_item_bitstream(item, old_bitstream)
-            with self._capture(DSpaceResponseLabel.ADD_METADATA):
-                self.client.add_metadata(
-                    item,
-                    field="dc.description.provenance",
-                    value=(f"Deleted bitstream on {time}: {old_bitstream.name}"),
-                )
+            self._add_provenance_metadata(
+                item, f"Deleted bitstream on {time}: {old_bitstream.name}"
+            )
 
         return bundle
+
+    def _add_provenance_metadata(self, item: Item, value: str) -> None:
+        """Add a provenance metadata entry to an item, logging any failure."""
+        try:
+            self.client.add_metadata(item, field="dc.description.provenance", value=value)
+        except Exception:
+            logger.exception(f"Failed to add provenance metadata to item '{item.handle}'")
+            raise
+        logger.debug("Added provenance metadata to item '%s'", item.handle)
 
     def _get_original_bundle(self, item: Item) -> Bundle:
         for bundle in self.client.get_bundles_iter(parent=item):
