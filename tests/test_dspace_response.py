@@ -8,6 +8,7 @@ from submitter.dspace_response import (
     TRUNCATION_SUFFIX,
     DSpaceResponseLabel,
     capture_responses,
+    format_response,
     truncate_body,
 )
 
@@ -68,3 +69,29 @@ def test_capture_responses_detaches_hook_on_exception():
     ):
         raise ValueError("boom")
     assert session.hooks["response"] == []
+
+
+def test_format_response_renders_entry():
+    entry = {
+        "status_code": 500,
+        "url": "mock://dspace.edu/x",
+        "method": "POST",
+        "elapsed": 0.5,
+        "body": "oops",
+    }
+    assert format_response(entry) == "POST mock://dspace.edu/x -> 500 (0.5s): oops"
+
+
+def test_format_response_handles_missing_fields():
+    assert "None" in format_response({})
+
+
+def test_capture_responses_yields_only_entries_from_this_context(mocked_dspace):
+    session = requests.Session()
+    collector = {}
+    with capture_responses(session, collector, DSpaceResponseLabel.CREATE_ITEM) as first:
+        session.get("mock://dspace.edu/server/api/pid/find")
+    with capture_responses(session, collector, DSpaceResponseLabel.CREATE_ITEM) as second:
+        session.get("mock://dspace.edu/server/api/pid/find")
+    assert len(first) == len(second) == 1
+    assert len(collector["create_item"]) == 2  # noqa: PLR2004

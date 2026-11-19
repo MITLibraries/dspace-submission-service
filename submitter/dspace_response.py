@@ -32,7 +32,7 @@ def capture_responses(
     session: "requests.Session",
     collector: dict[str, list[dict]],
     label: DSpaceResponseLabel,
-) -> Generator[None]:
+) -> Generator[list[dict]]:
     """Record DSpace responses into a dict.
 
     The hook is attached only while the wrapped call runs, so requests made outside
@@ -42,7 +42,12 @@ def capture_responses(
         session: The requests session to attach the response hook to.
         collector: A dict to collect parsed responses.
         label: The label under which to store the captured responses.
+
+    Yields:
+        A list that receives only the entries captured within this context, so
+        callers can report on the responses of a single call.
     """
+    captured: list[dict] = []
 
     def hook(
         response: "requests.Response",
@@ -53,6 +58,7 @@ def capture_responses(
                 return
             entry = parse_response(response)
             collector.setdefault(label, []).append(entry)
+            captured.append(entry)
             logger.debug(
                 "DSpace response captured [%s]: %s %s -> %s",
                 label,
@@ -65,9 +71,17 @@ def capture_responses(
 
     session.hooks["response"].append(hook)
     try:
-        yield
+        yield captured
     finally:
         session.hooks["response"].remove(hook)
+
+
+def format_response(entry: dict[str, Any]) -> str:
+    """Render a captured response entry as a single log-friendly string."""
+    return (
+        f"{entry.get('method')} {entry.get('url')} -> {entry.get('status_code')} "
+        f"({entry.get('elapsed')}s): {entry.get('body')}"
+    )
 
 
 def truncate_body(text: str) -> str:
