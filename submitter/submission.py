@@ -15,7 +15,11 @@ from dspace_rest_client.models import Bitstream, Bundle, Item
 
 from submitter import errors
 from submitter.config import Config
-from submitter.dspace_response import DSpaceResponseLabel, capture_responses
+from submitter.dspace_response import (
+    DSpaceResponseLabel,
+    capture_responses,
+    log_failed_responses,
+)
 from submitter.message import validate_message
 
 if TYPE_CHECKING:
@@ -80,7 +84,8 @@ class Submission:
         logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
         try:
-            item, bundle = self._submit_item()
+            with self._log_failures():
+                item, bundle = self._submit_item()
             self.result_success_message(item, bundle)
 
         # Expected exception, generate error message and continue
@@ -91,7 +96,7 @@ class Submission:
 
         # DSpace timeout error, abort
         except requests.exceptions.Timeout as exception:
-            dspace_url = self.client.base_url if self.client else "Unknown DSpace URL"
+            dspace_url = self.client.API_ENDPOINT if self.client else "Unknown DSpace URL"
             raise errors.DSpaceTimeoutError(
                 dspace_url, self.result_attributes
             ) from exception
@@ -394,28 +399,30 @@ class Submission:
         new_bitstreams = self._upload_new_item_bitstreams(item, bundle)
 
         # add metadata entry for successfully added bitstreams
-        with self._capture(DSpaceResponseLabel.ADD_METADATA):
-            self.client.add_metadata(
-                item,
-                field="dc.description.provenance",
-                value=(
-                    f"Updated bitstreams on {time}: "
-                    f"{[bitstream.name for bitstream in new_bitstreams]}"
-                ),
-            )
+        self._add_provenance_metadata(
+            item,
+            f"Updated bitstreams on {time}: "
+            f"{[bitstream.name for bitstream in new_bitstreams]}",
+        )
 
         # delete original bitstream
         # add metadata entry for deleted bitstream
         if old_bitstream is not None:
             self._delete_old_item_bitstream(item, old_bitstream)
-            with self._capture(DSpaceResponseLabel.ADD_METADATA):
-                self.client.add_metadata(
-                    item,
-                    field="dc.description.provenance",
-                    value=(f"Deleted bitstream on {time}: {old_bitstream.name}"),
-                )
+            self._add_provenance_metadata(
+                item, f"Deleted bitstream on {time}: {old_bitstream.name}"
+            )
 
         return bundle
+
+    def _add_provenance_metadata(self, item: Item, value: str) -> None:
+        """Add a provenance metadata entry to an item, logging any failure."""
+        try:
+            self.client.add_metadata(item, field="dc.description.provenance", value=value)
+        except Exception:
+            logger.exception(f"Failed to add provenance metadata to item '{item.handle}'")
+            raise
+        logger.debug("Added provenance metadata to item '%s'", item.handle)
 
     def _get_original_bundle(self, item: Item) -> Bundle:
         for bundle in self.client.get_bundles_iter(parent=item):
@@ -633,6 +640,14 @@ class Submission:
             )
             return
         logger.info("Item '%s' deleted from DSpace", identifier)
+
+    def _log_failures(self) -> AbstractContextManager[None]:
+        """Log failed (status >= 400) DSpace responses made within this context."""
+        package_id = self.result_attributes.get("PackageID", {}).get(
+            "StringValue", "unknown"
+        )
+        context = f"PackageID={package_id} destination={self.destination}"
+        return log_failed_responses(self.client.session, context)
 
     def _capture(self, label: DSpaceResponseLabel) -> AbstractContextManager[None]:
         """Capture DSpace responses made by the client within this context."""
