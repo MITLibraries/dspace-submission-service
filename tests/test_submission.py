@@ -1,4 +1,5 @@
 # ruff: noqa: SLF001
+import logging
 import re
 import sys
 import traceback
@@ -512,3 +513,60 @@ def test_dspace_response_delete_item_recorded_on_cleanup(
     )
     entry = dspace_submission_instance.dspace_responses["delete_item"][0]
     assert entry["status_code"] == 204  # noqa: PLR2004
+
+
+def _failure_records(caplog):
+    return [
+        r
+        for r in caplog.records
+        if r.name == "submitter.dspace_response" and r.levelno == logging.ERROR
+    ]
+
+
+def test_submit_logs_failed_read_call_with_submission_context(
+    dspace_submission_instance, mocked_dspace, caplog
+):
+    mocked_dspace.get(
+        "mock://dspace.edu/server/api/pid/find",
+        status_code=500,
+        text="lookup exploded",
+    )
+    dspace_submission_instance.result_attributes = {
+        "PackageID": {"DataType": "String", "StringValue": "pkg-123"}
+    }
+    with patch.object(Submission, "get_dspace_client") as get_client:
+        get_client.return_value = dspace_submission_instance.client
+        dspace_submission_instance.submit()
+    messages = [r.getMessage() for r in _failure_records(caplog)]
+    assert any("PackageID=pkg-123" in m and "lookup exploded" in m for m in messages)
+
+
+def test_submit_detaches_failure_hook_even_on_error(
+    dspace_submission_instance, mocked_dspace
+):
+    mocked_dspace.get("mock://dspace.edu/server/api/pid/find", status_code=500)
+    client = dspace_submission_instance.client
+    with patch.object(Submission, "get_dspace_client", return_value=client):
+        dspace_submission_instance.submit()
+    assert client.session.hooks["response"] == []
+
+
+def test_failure_hook_context_is_per_submission_on_shared_client(
+    dspace_submission_instance, mocked_dspace, caplog
+):
+    mocked_dspace.get("mock://dspace.edu/server/api/pid/find", status_code=500)
+    client = dspace_submission_instance.client
+    for package_id in ("pkg-a", "pkg-b"):
+        submission = Submission(
+            destination="DSpace@MIT",
+            collection_handle="0000/collection01",
+            metadata_location="tests/fixtures/test-item-metadata.json",
+            files=[],
+            result_queue=None,
+            attributes={"PackageID": {"DataType": "String", "StringValue": package_id}},
+        )
+        with patch.object(Submission, "get_dspace_client", return_value=client):
+            submission.submit()
+    messages = [r.getMessage() for r in _failure_records(caplog)]
+    assert sum("PackageID=pkg-a" in m for m in messages) == 1
+    assert sum("PackageID=pkg-b" in m for m in messages) == 1

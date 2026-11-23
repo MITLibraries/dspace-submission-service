@@ -15,7 +15,11 @@ from dspace_rest_client.models import Bitstream, Bundle, Item
 
 from submitter import errors
 from submitter.config import Config
-from submitter.dspace_response import DSpaceResponseLabel, capture_responses
+from submitter.dspace_response import (
+    DSpaceResponseLabel,
+    capture_responses,
+    log_failed_responses,
+)
 from submitter.message import validate_message
 
 if TYPE_CHECKING:
@@ -80,7 +84,8 @@ class Submission:
         logger.debug("Current clients in cache: %s", list(dspace_clients.keys()))
 
         try:
-            item, bundle = self._submit_item()
+            with self._log_failures():
+                item, bundle = self._submit_item()
             self.result_success_message(item, bundle)
 
         # Expected exception, generate error message and continue
@@ -635,6 +640,14 @@ class Submission:
             )
             return
         logger.info("Item '%s' deleted from DSpace", identifier)
+
+    def _log_failures(self) -> AbstractContextManager[None]:
+        """Log failed (status >= 400) DSpace responses made within this context."""
+        package_id = self.result_attributes.get("PackageID", {}).get(
+            "StringValue", "unknown"
+        )
+        context = f"PackageID={package_id} destination={self.destination}"
+        return log_failed_responses(self.client.session, context)
 
     def _capture(self, label: DSpaceResponseLabel) -> AbstractContextManager[None]:
         """Capture DSpace responses made by the client within this context."""

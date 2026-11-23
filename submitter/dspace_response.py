@@ -14,6 +14,11 @@ TRUNCATION_SUFFIX = "...[truncated]"
 
 EXCLUDED_URL_FRAGMENTS = ("/authn/",)
 
+FAILURE_STATUS_THRESHOLD = 400
+REDACTED = "<redacted>"
+SENSITIVE_REQUEST_HEADERS = frozenset({"authorization", "cookie", "x-xsrf-token"})
+LOGGED_RESPONSE_HEADERS = ("Content-Type", "Retry-After")
+
 
 class DSpaceResponseLabel(StrEnum):
     """Keys for Submission.dspace_responses based on the DSS method."""
@@ -68,6 +73,75 @@ def capture_responses(
         yield
     finally:
         session.hooks["response"].remove(hook)
+
+
+@contextmanager
+def log_failed_responses(session: "requests.Session", context: str) -> Generator[None]:
+    """Log every failed (status >= 400) DSpace response made through a session.
+
+    Authentication requests (EXCLUDED_URL_FRAGMENTS) are never logged, so login
+    credentials cannot reach the logs.
+
+    The hook is attached only while the wrapped block runs, so a cached, shared
+    session never keeps a hook carrying a stale submission's context.
+
+    Args:
+        session: The requests session to attach the response hook to.
+        context: Text identifying the submission, included in each log record.
+    """
+
+    def hook(
+        response: "requests.Response",
+        **_kwargs: Any,  # noqa: ANN401
+    ) -> None:
+        try:
+            if response.status_code < FAILURE_STATUS_THRESHOLD or any(
+                f in response.url for f in EXCLUDED_URL_FRAGMENTS
+            ):
+                return
+            logger.error(
+                "DSpace request failed [%s]: %s",
+                context,
+                format_failed_exchange(response),
+            )
+        except Exception:
+            logger.warning("Failed to log DSpace response", exc_info=True)
+
+    session.hooks["response"].append(hook)
+    try:
+        yield
+    finally:
+        session.hooks["response"].remove(hook)
+
+
+def format_failed_exchange(response: "requests.Response") -> str:
+    """Render a failed request/response pair for logging."""
+    headers = {
+        name: response.headers[name]
+        for name in LOGGED_RESPONSE_HEADERS
+        if name in response.headers
+    }
+    elapsed = response.elapsed.total_seconds() if response.elapsed is not None else None
+    return (
+        f"request=({format_request(response.request)}) "
+        f"response=(status={response.status_code} reason={response.reason!r} "
+        f"elapsed={elapsed} headers={headers} body={parse_response(response)['body']!r})"
+    )
+
+
+def format_request(request: "requests.PreparedRequest | None") -> str:
+    """Render a request for logging, redacting credentials."""
+    if request is None:
+        return "<no request>"
+    headers = {
+        name: REDACTED if name.lower() in SENSITIVE_REQUEST_HEADERS else value
+        for name, value in request.headers.items()
+    }
+    raw = request.body
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace")
+    body = truncate_body(raw or "")
+    return f"{request.method} {request.url} headers={headers} body={body!r}"
 
 
 def truncate_body(text: str) -> str:
